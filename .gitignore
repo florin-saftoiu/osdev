@@ -1,0 +1,7 @@
+.vscode
+
+*.o
+*.exe
+*.tmp
+*.bin
+*.img
