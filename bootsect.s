@@ -22,21 +22,24 @@ _start:
     mov     $msg_start, %si
     call    _print
 
-# load the next sector and print it to the first null
-    mov     $1, %ax
-    mov     $1, %si
-    mov     $0x8000, %bx
+    mov     $1, %ax                         # starting at sector 1
+    mov     $1, %si                         # load 1 sector(s)
+    mov     $0x8000, %bx                    # at 0x8000
     call    _readsec
-    jnc     _kernel
+    jnc     _kernel_loaded
 
-    mov     $msg_error, %si
+    mov     $msg_error, %si                 # if error print message and hang
     call    _print
+    jmp     _hang
+
+_kernel_loaded:
+                                            # TODO - enter protected mode
+
+    mov     $0x8000, %ax                    # jump to kernel
+    jmp     *%ax
 
 _hang:
     jmp     _hang
-
-_kernel:
-    jmp     *%bx
 
 .include "print.s"
 
