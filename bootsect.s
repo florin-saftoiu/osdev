@@ -34,6 +34,31 @@ _start:
 
 _pm:
     cli
+
+    call    _check_a20
+    jne     1f
+    mov     $msg_wraps, %si
+    call    _print
+    jmp     2f
+1:
+    mov     $msg_not_wraps, %si
+    call    _print
+    jmp     5f
+2:
+    in      $0x92, %al
+    or      $0x2, %al
+    out     %al, $0x92                      # enable A20 line
+
+    call    _check_a20
+    jne     4f
+    mov     $msg_wraps, %si
+    call    _print
+    jmp     _hang
+4:
+    mov     $msg_not_wraps, %si
+    call    _print
+5:
+
     lgdt    gdt_desc
     mov     %cr0, %ax
     or      $1, %ax
@@ -120,11 +145,53 @@ _readsec:
     pop     %ax
     ret
 
+# check if memory wraps, if it does than A20 is disabled, otherwise it is enabled
+# write 0x00 at 0x0000:0x0500
+# write 0xff at 0xffff:0x0510
+# compare 0xff with value at 0x0000:0x0500
+# if equal (ZF=1) than memory wraps else (ZF=0) memory does not wrap
+# input: none
+# ouput: ZF - set if memory wraps, clear if memory does not wrap
+#        %ax, %es, %di, %ds, %si are left as they were before call
+_check_a20:
+    push    %ax
+    push    %es
+    push    %di
+    push    %ds
+    push    %si
+    xor     %ax, %ax
+    mov     %ax, %es
+    mov     $0x500, %di
+    mov     %es:(%di), %al
+    push    %ax
+    movb    $0x00, %es:(%di)
+    mov     $0xffff, %ax
+    mov     %ax, %ds
+    mov     $0x510, %si
+    mov     %ds:(%si), %al
+    push    %ax
+    movb    $0xff, %ds:(%si)
+    cmpb    $0xff, %es:(%di)
+    pop     %ax
+    mov     %al, %ds:(%si)
+    pop     %ax
+    mov     %al, %es:(%di)
+    pop     %si
+    pop     %ds
+    pop     %di
+    pop     %es
+    pop     %ax
+    ret
+
 # data
 msg_start:
     .asciz "Loading kernel ...\r\n"
 msg_error:
     .asciz "Failed to load kernel.\r\n"
+msg_wraps:
+    .asciz "Memory wraps, A20 line disabled.\r\n"
+msg_not_wraps:
+    .asciz "Memory doesn't wrap, A20 line enabled.\r\n"
 sec_per_track:
     .byte 18
 num_heads:
