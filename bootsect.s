@@ -48,10 +48,10 @@ _start32:
     mov     %ax, %fs
     mov     %ax, %gs
     mov     %ax, %ss                        # point all data segment registers to the data segment (offset 0x10 in the GDT)
-    mov     $0x90000, %esp
+    mov     $0x80000, %esp                  # stack will grow down from 0x80000, extended BIOS data area is mapped after that address
     
     movb    $'P', 0xb8000                   # write a P in the first cell of video memory
-    movb    $0x1b, 0xb8001                  # with cyan color
+    movb    $0x1b, 0xb8001                  # with light cyan color on blue background
 
     mov     $0x8000, %ax                    # jump to kernel
     jmp     *%ax

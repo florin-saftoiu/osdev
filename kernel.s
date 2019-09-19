@@ -5,8 +5,8 @@
 .code32
 
 _kstart:
-    movb    $'K', 0xb8000                   # write a K in the first cell of video memory
-    movb    $0x1b, 0xb8001                  # with cyan color
+    movb    $'K', 0xb8002                   # write a K in the second cell of video memory
+    movb    $0x6a, 0xb8003                  # with light green color on brown background
 
 _kend:
     jmp     _kend
