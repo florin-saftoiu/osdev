@@ -11,20 +11,24 @@
 # dd if=/dev/zero of=drive.img bs=512 count=2
 # dd if=bootsect.bin of=drive.img
 .code16
+.set kernel_start, 0x8000
+.set idt_start, 0x7400                      # IDT offset
 
 _start:
+    cli
     xor     %ax, %ax
     mov     %ax, %ds                        # useful for call to _print
     mov     %ax, %es                        # useful for call to _readsec
-    mov     $0x7e00, %ax
+    mov     $((kernel_start - 0x200) / 0x10), %ax
     mov     %ax, %ss                        # stack starts right after the boot sector
-    mov     $0x200, %sp                     # stack length 512 bytes
+    mov     $0x1fe, %sp                     # stack length 512 bytes, will grow down from kernel_start
+    sti
     mov     $msg_start, %si
     call    _print
 
     mov     $1, %ax                         # starting at sector 1
     mov     $1, %si                         # load 1 sector(s)
-    mov     $0x8000, %bx                    # at 0x8000
+    mov     $kernel_start, %bx              # at kernel_start
     call    _readsec
     jnc     _pm
 
@@ -33,6 +37,8 @@ _start:
     jmp     _hang
 
 _pm:
+    mov     $msg_ok, %si
+    call    _print
     cli
 
     call    _check_a20
@@ -60,6 +66,12 @@ _pm:
 5:
 
     lgdt    gdt_desc
+
+    mov     $idt_start, %di
+    mov     $2048, %cx
+    rep     stosb                           # setup empty IDT starting at 0x7400, right up to 0x7c00
+    lidt    idt_desc
+
     mov     %cr0, %ax
     or      $1, %ax
     mov     %ax, %cr0                       # switch to protected mode
@@ -73,12 +85,12 @@ _start32:
     mov     %ax, %fs
     mov     %ax, %gs
     mov     %ax, %ss                        # point all data segment registers to the data segment (offset 0x10 in the GDT)
-    mov     $0x80000, %esp                  # stack will grow down from 0x80000, extended BIOS data area is mapped after that address
+    mov     $0x7fffc, %esp                  # stack will grow down from 0x80000, extended BIOS data area is mapped after that address
     
     movb    $'P', 0xb8000                   # write a P in the first cell of video memory
     movb    $0x1b, 0xb8001                  # with light cyan color on blue background
 
-    mov     $0x8000, %ax                    # jump to kernel
+    mov     $kernel_start, %ax              # jump to kernel
     jmp     *%ax
 _hang32:
     jmp     _hang32
@@ -108,10 +120,7 @@ _print:
 #         %es:%bx - buffer address
 # output: data from logical sector in %ax at memory location %es:%bx
 #         CF - set on error
-#         %ax, %dl, %si, %es, %bx are left as they were before call
 _readsec:
-    push    %ax
-    push    %dx
     mov     $3, %di                         # retry counter
 1:
     push    %bx
@@ -141,8 +150,6 @@ _readsec:
     int     $0x13
     jnc     1b
 2:
-    pop     %dx
-    pop     %ax
     ret
 
 # check if memory wraps, if it does than A20 is disabled, otherwise it is enabled
@@ -154,11 +161,8 @@ _readsec:
 # ouput: ZF - set if memory wraps, clear if memory does not wrap
 #        %ax, %es, %di, %ds, %si are left as they were before call
 _check_a20:
-    push    %ax
     push    %es
-    push    %di
     push    %ds
-    push    %si
     xor     %ax, %ax
     mov     %ax, %es
     mov     $0x500, %di
@@ -176,22 +180,21 @@ _check_a20:
     mov     %al, %ds:(%si)
     pop     %ax
     mov     %al, %es:(%di)
-    pop     %si
     pop     %ds
-    pop     %di
     pop     %es
-    pop     %ax
     ret
 
 # data
 msg_start:
-    .asciz "Loading kernel ...\r\n"
+    .asciz "Loading kernel ..."
+msg_ok:
+    .asciz " OK."
 msg_error:
-    .asciz "Failed to load kernel.\r\n"
+    .asciz " failed."
 msg_wraps:
-    .asciz "Memory wraps, A20 line disabled.\r\n"
+    .asciz "\r\nA20 line disabled."
 msg_not_wraps:
-    .asciz "Memory doesn't wrap, A20 line enabled.\r\n"
+    .asciz "\r\nA20 line enabled."
 sec_per_track:
     .byte 18
 num_heads:
@@ -217,8 +220,13 @@ gdt_data:                                   # data segment (selector (offset fro
     .byte 0                                 # base 0x0, bits 24..31
 gdt_end:
 gdt_desc:
-    .word gdt_end - gdt_start - 1           # limit is byte (gdt_end - gdt_start - 1), size is (gdt_end - gdt_start), LGDT expects the limit, not the size
+    .word gdt_end - gdt_start - 1           # limit is (gdt_end - gdt_start - 1), size is (gdt_end - gdt_start), LGDT expects the limit, not the size
     .long gdt_start
+
+# interrupt descriptor table descriptor
+idt_desc:
+    .word 2047                              # limit is 2047, size is 2048
+    .long idt_start
 
 # fill up the sector
 .fill 510 - (. - _start), 1, 0

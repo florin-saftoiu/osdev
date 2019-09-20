@@ -7,7 +7,7 @@ OBJS:=$(SRCS:%.s=%.o)
 TMPS:=$(SRCS:%.s=%.tmp)
 BINS:=$(SRCS:%.s=%.bin)
 
-all: ${BINS} bootsect_to_img kernel_to_img
+all: ${BINS} bootsect_to_img kernel_to_img bootsect_to_vhd kernel_to_vhd
 
 init_img:
 	dd if=/dev/zero of=drive.img bs=512 count=2
@@ -17,6 +17,12 @@ bootsect_to_img: init_img bootsect.bin
 
 kernel_to_img: init_img kernel.bin
 	dd if=kernel.bin of=drive.img seek=1 bs=512
+
+bootsect_to_vhd: bootsect.bin
+	dd if=bootsect.bin of=drive.vhd
+
+kernel_to_vhd: kernel.bin
+	dd if=kernel.bin of=drive.vhd seek=1 bs=512
 
 %.bin: %.tmp
 	objcopy -O binary -j .text $< $@
