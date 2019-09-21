@@ -5,8 +5,12 @@
 .code64
 
 _kstart:
-    movb    $'K', 0xb8000                   # write a K in the first cell of video memory
-    movb    $0x6a, 0xb8001                  # with light green color on brown background
+    mov     $0xb8000, %rdi
+    xor     %rax, %rax
+    mov     $500, %rcx
+    rep     stosq                           # clear screen by writing 0 in all 2000 cells of the video memory at 0xb8000
+    mov     $0x2f592f412f4b2f4f, %rax
+    mov     %rax, 0xb8000                   # write OKAY in white on light green background
 
 _kend:
     jmp     _kend
