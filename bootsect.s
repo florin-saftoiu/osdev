@@ -11,9 +11,13 @@
 # dd if=/dev/zero of=drive.img bs=512 count=2
 # dd if=bootsect.bin of=drive.img
 .code16
+.set pml4t_start, 0x2000                    # paging tables, aligned to 4096 bytes
+.set pdpt_start, 0x3000
+.set pdt_start, 0x4000
+.set pt_start, 0x5000
+.set idt64_start, 0x6400
+.set idt_start, 0x7400
 .set kernel_start, 0x8000
-.set idt_start, 0x7400                      # IDT offset
-
 _start:
     cli
     xor     %ax, %ax
@@ -80,20 +84,59 @@ _pm:
 .code32
 _start32:
     mov     $0x10, %ax
-    mov     %ax, %ds
-    mov     %ax, %es
-    mov     %ax, %fs
-    mov     %ax, %gs
+    mov     %ax, %es                        # we need %es for all the stos instructions, but we have no need for %ds, %fs, %gs
     mov     %ax, %ss                        # point all data segment registers to the data segment (offset 0x10 in the GDT)
-    mov     $0x7fffc, %esp                  # stack will grow down from 0x80000, extended BIOS data area is mapped after that address
-    
-    movb    $'P', 0xb8000                   # write a P in the first cell of video memory
-    movb    $0x1b, 0xb8001                  # with light cyan color on blue background
+    mov     $(kernel_start - 4), %esp       # stack will grow down from kernel_start, same as in real mode
 
-    mov     $kernel_start, %ax              # jump to kernel
-    jmp     *%ax
-_hang32:
-    jmp     _hang32
+    
+    movl    $pml4t_start, %edi
+    mov     %edi, %cr3                      # point %cr3 to pml4t
+    xor     %eax, %eax
+    mov     $4096, %ecx
+    rep     stosl                           # clear pml4t + pdpt + pdt + pt (stosl writes 4 bytes at a time, so all 4 tables get cleared)
+
+    mov     %cr3, %edi                      # restore %edi from %cr3, since it was modified by stosl
+    movl    $(pdpt_start + 3), (%edi)       # pml4t[0] -> pdpt[0] + set bits for page is present and writable
+    add     $0x1000, %edi
+    movl    $(pdt_start + 3), (%edi)        # pdpt[0] -> pdt[0] + set bits for page is present and writable
+    add     $0x1000, %edi
+    movl    $(pt_start + 3), (%edi)         # pdt[0] -> pt[0] + set bits for page is present and writable
+    add     $0x1000, %edi
+    mov     $0x3, %ebx
+    mov     $512, %ecx
+1:
+    mov     %ebx, (%edi)                    # pt[i] -> 0x0 + (0x1000 * i) + set bits for page is present and writable
+    add     $0x1000, %ebx
+    add     $8, %edi
+    loop    1b
+
+    mov     %cr4, %eax
+    or      $(1 << 5), %eax
+    mov     %eax, %cr4                      # enable PAE
+
+    mov     $0xc0000080, %ecx
+    rdmsr
+    or      $(1 << 8), %eax
+    wrmsr                                   # set long mode bit
+
+    mov     %cr0, %eax
+    or      $(1 << 31), %eax
+    mov     %eax, %cr0                      # enable paging and get into long mode - compatibility submode
+
+    lgdt    gdt64_desc
+    ljmp    $0x8, $_start64                 # far jump into the code segment (offset 0x8 in the GDT64) to reset %cs and get into long mode - 64bit submode
+
+.code64
+_start64:
+    mov     $idt64_start, %rdi
+    mov     $4096, %rcx
+    rep     stosb                           # setup empty IDT starting at 0x6400, right up to 0x7400
+    lidt    idt64_desc
+
+    mov     $(kernel_start - 4), %rsp       # stack will grow down from kernel_start, same as in real and protected mode
+
+    mov     $kernel_start, %rax
+    jmp     *%rax
 
 .code16
 _hang:
@@ -186,15 +229,15 @@ _check_a20:
 
 # data
 msg_start:
-    .asciz "Loading kernel ..."
+    .asciz "L"                              # loading kernel
 msg_ok:
-    .asciz " OK."
+    .asciz "O"                              # loaded ok
 msg_error:
-    .asciz " failed."
+    .asciz "E"                              # error loading
 msg_wraps:
-    .asciz "\r\nA20 line disabled."
+    .asciz "0"                              # A20 line is disabled
 msg_not_wraps:
-    .asciz "\r\nA20 line enabled."
+    .asciz "1"                              # A20 line is enabled
 sec_per_track:
     .byte 18
 num_heads:
@@ -208,7 +251,7 @@ gdt_code:                                   # code segment (selector (offset fro
     .word 0xFFFF                            # limit 4Gb, bits 0..15
     .word 0                                 # base 0x0, bits 0..15
     .byte 0                                 # base 0x0, bits 16..23
-    .byte 0b10011010                        # [ present flag = 1 | privilege level = 00 (OS) | type = 1 (code or data) | type = 1 (code) | conforming = 0 (non-conforming) | readable = 1 | access flag = 0 (set by cpu) ]
+    .byte 0b10011010                        # [ present flag = 1 | privilege level = 00 (OS) | type = 1 (code or data) | type = 1 (executable) | conforming = 0 (non-conforming) | readable = 1 | access flag = 0 (set by cpu) ]
     .byte 0b11001111                        # [ granularity = 1 (multiply by 4k) | size = 1 (32bit) | intel reserved = 0 | ignored = 0 ] + limit 4Gb, bits 16..19
     .byte 0                                 # base 0x0, bits 24..31
 gdt_data:                                   # data segment (selector (offset from gdt_start) = 0x10)
@@ -223,10 +266,38 @@ gdt_desc:
     .word gdt_end - gdt_start - 1           # limit is (gdt_end - gdt_start - 1), size is (gdt_end - gdt_start), LGDT expects the limit, not the size
     .long gdt_start
 
+# global descriptor table 64bit
+gdt64_start:
+gdt64_null:                                 # null segment
+    .quad 0
+gdt64_code:                                 # code segment (selector (offset from gdt_start) = 0x8)
+    .word 0                                 # limit 4Gb, bits 0..15
+    .word 0                                 # base 0x0, bits 0..15
+    .byte 0                                 # base 0x0, bits 16..23
+    .byte 0b10011010                        # [ present flag = 1 | privilege level = 00 (OS) | type = 1 (code or data) | type = 1 (executable) | conforming = 0 (non-conforming) | readable = 1 | access flag = 0 (set by cpu) ]
+    .byte 0b10101111                        # [ granularity = 1 (multiply by 4k) | size = 0 (64bit) | 64bit code descriptor = 1 | ignored = 0 ] + limit 4Gb, bits 16..19
+    .byte 0                                 # base 0x0, bits 24..31
+gdt64_data:                                 # data segment (selector (offset from gdt_start) = 0x10)
+    .word 0                                 # limit 4Gb, bits 0..15
+    .word 0                                 # base 0x0, bits 0..15
+    .byte 0                                 # base 0x0, bits 16..23
+    .byte 0b10010010                        # [ present flag = 1 | privilege level = 00 (OS) | type = 1 (code or data) | type = 0 (data) | expand = 0 (expand down) | writable = 1 | access flag = 0 (set by cpu) ]
+    .byte 0b00000000                        # [ granularity = 0 (multiply by 1) | ignored = 0 | intel reserved = 0 | ignored = 0 ] + limit 4Gb, bits 16..19
+    .byte 0                                 # base 0x0, bits 24..31
+gdt64_end:
+gdt64_desc:
+    .word gdt64_end - gdt64_start - 1       # limit is (gdt_end - gdt_start - 1), size is (gdt_end - gdt_start), LGDT expects the limit, not the size
+    .long gdt64_start
+
 # interrupt descriptor table descriptor
 idt_desc:
     .word 2047                              # limit is 2047, size is 2048
     .long idt_start
+
+# interrupt descriptor table descriptor 64bit
+idt64_desc:
+    .word 4095                              # limit is 2047, size is 2048
+    .long idt64_start
 
 # fill up the sector
 .fill 510 - (. - _start), 1, 0
