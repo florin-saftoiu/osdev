@@ -8,3 +8,13 @@ Requirements
   * diffutils
 * qemu
 * vscode
+
+TODO
+====
+1. separate boot in 2 stages
+2. load 2nd stage and kernel from exfat
+3. load kernel as ELF64 file
+4. write strings to video memory
+5. write CRLF to video memory
+6. scroll screen
+7. beyond ...
