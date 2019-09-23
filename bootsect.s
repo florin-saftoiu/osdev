@@ -76,9 +76,9 @@ _pm:
     rep     stosb                           # setup empty IDT starting at 0x7400, right up to 0x7c00
     lidt    idt_desc
 
-    mov     %cr0, %ax
+    mov     %cr0, %eax
     or      $1, %ax
-    mov     %ax, %cr0                       # switch to protected mode
+    mov     %eax, %cr0                      # switch to protected mode
     ljmp    $0x8, $_start32                 # far jump into the code segment (offset 0x8 in the GDT) to reset %cs
 
 .code32

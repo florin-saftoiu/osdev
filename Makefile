@@ -13,16 +13,16 @@ init_img:
 	dd if=/dev/zero of=drive.img bs=512 count=2
 
 bootsect_to_img: init_img bootsect.bin
-	dd if=bootsect.bin of=drive.img
+	dd if=bootsect.bin of=drive.img conv=notrunc
 
 kernel_to_img: init_img kernel.bin
-	dd if=kernel.bin of=drive.img seek=1 bs=512
+	dd if=kernel.bin of=drive.img seek=1 bs=512 conv=notrunc
 
 bootsect_to_vhd: bootsect.bin
-	dd if=bootsect.bin of=drive.vhd
+	dd if=bootsect.bin of=drive.vhd conv=notrunc
 
 kernel_to_vhd: kernel.bin
-	dd if=kernel.bin of=drive.vhd seek=1 bs=512
+	dd if=kernel.bin of=drive.vhd seek=1 bs=512 conv=notrunc
 
 %.bin: %.tmp
 	objcopy -O binary -j .text $< $@
