@@ -1,6 +1,5 @@
-; nasm -f win32 test.asm -o test.o
-; ld -o test_64.exe -L"C:\Program Files\mingw-w64\x86_64-8.1.0-posix-seh-rt_v6-rev0\mingw64\x86_64-w64-mingw32\lib" test_64.o -lkernel32 -luser32
-; MAKE SURE LD IS 64-bit !!!
+; nasm -f win64 test.asm -o test.o
+; ld -o test_64.exe -L/c/msys64/mingw64/x86_64-w64-mingw32/lib test_64.o -lkernel32 -luser32
 
 NULL          EQU 0                         ; constants
 MB_DEFBUTTON1 EQU 0
@@ -13,7 +12,7 @@ extern ExitProcess
 
 global Start
 
-section .data
+section .rdata                              ; call it .rdata to get around a nasty LD bug that causes the .rdata section to take space even if missing
     caption db '64-bit hello!', 0
     message db 'Hello World!', 0
 
