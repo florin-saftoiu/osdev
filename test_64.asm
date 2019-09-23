@@ -1,5 +1,5 @@
-; nasm -f win64 test.asm -o test.o
-; ld -o test_64.exe -L/c/msys64/mingw64/x86_64-w64-mingw32/lib test_64.o -lkernel32 -luser32
+; nasm -f win64 test_64.asm -o test_64.o
+; ld -o test_64.exe -LC:\msys64\mingw64\x86_64-w64-mingw32\lib test_64.o -lkernel32 -luser32
 
 NULL          EQU 0                         ; constants
 MB_DEFBUTTON1 EQU 0

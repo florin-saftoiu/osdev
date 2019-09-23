@@ -1,10 +1,10 @@
 Requirements
 ============
 * windows
-* mingw-w64 - i686 and x86_64
-* msys2 - i686 and x86_64, for building cross compiler, with following packages
+* msys2 - x86_64, with following packages
+  * mingw-w64-i686-toolchain
   * mingw-w64-x86_64-toolchain
-* nasm
+  * nasm
+  * diffutils
 * qemu
-* dd for windows
 * vscode
