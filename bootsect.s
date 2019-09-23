@@ -9,7 +9,7 @@
 # break *0x7c00
 # continue
 # dd if=/dev/zero of=drive.img bs=512 count=2
-# dd if=bootsect.bin of=drive.img
+# dd if=bootsect.bin of=drive.img conv=notrunc
 .code16
 .set pml4t_start, 0x2000                    # paging tables, aligned to 4096 bytes
 .set pdpt_start, 0x3000

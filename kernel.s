@@ -1,7 +1,7 @@
 # as kernel.s -o kernel.o
 # ld -T NUL -Ttext=0x8000 -o kernel.tmp kernel.o
 # objcopy -O binary -j .text kernel.tmp kernel.bin
-# dd if=kernel.bin of=drive.img seek=1 bs=512
+# dd if=kernel.bin of=drive.img seek=1 bs=512 conv=notrunc
 .code64
 
 _kstart:
