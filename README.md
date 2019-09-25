@@ -11,10 +11,9 @@ Requirements
 
 TODO
 ====
-1. separate boot in 2 stages
-2. load 2nd stage and kernel from exfat
-3. load kernel as ELF64 file
-4. write strings to video memory
-5. write CRLF to video memory
-6. scroll screen
-7. beyond ...
+1. load 2nd stage and kernel from exfat
+2. load kernel as ELF64 file
+3. write strings to video memory
+4. write CRLF to video memory
+5. scroll screen
+6. beyond ...

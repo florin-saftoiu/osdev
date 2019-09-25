@@ -1,7 +1,7 @@
 // x86_64-elf-gcc -c krnl.c -o krnl.o -ffreestanding -O2 -Wall -Wextra
-// x86_64-elf-ld.exe -T NUL -Ttext=0x8000 -o krnl.tmp krnl.o
-// x86_64-elf-objcopy.exe -O binary -j .text krnl.tmp krnl.bin
-// dd if=krnl.bin of=drive.img seek=1 bs=512 conv=notrunc
+// x86_64-elf-ld -T NUL -Ttext=0x8400 -o krnl.tmp krnl.o
+// x86_64-elf-objcopy -O binary -j .text krnl.tmp krnl.bin
+// dd if=krnl.bin of=drive.img seek=3 bs=512 conv=notrunc
 #include <stdint.h>
 
 enum vga_color {
@@ -20,7 +20,7 @@ enum vga_color {
     VGA_COLOR_LIGHT_RED = 12,
     VGA_COLOR_LIGHT_MAGENTA = 13,
     VGA_COLOR_LIGHT_BROWN = 14,
-    VGA_COLOR_WHITE = 15,
+    VGA_COLOR_WHITE = 15
 };
 
 static inline uint8_t vga_entry_color(enum vga_color fg, enum vga_color bg) {

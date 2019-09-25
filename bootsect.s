@@ -11,134 +11,36 @@
 # dd if=/dev/zero of=drive.img bs=512 count=2
 # dd if=bootsect.bin of=drive.img conv=notrunc
 .code16
-.set pml4t_start, 0x2000                    # paging tables, aligned to 4096 bytes
-.set pdpt_start, 0x3000
-.set pdt_start, 0x4000
-.set pt_start, 0x5000
-.set idt64_start, 0x6400
-.set idt_start, 0x7400
-.set kernel_start, 0x8000
+.set stage2_start, 0x8000
 _start:
     cli
     xor     %ax, %ax
     mov     %ax, %ds                        # useful for call to _print
     mov     %ax, %es                        # useful for call to _readsec
-    mov     $((kernel_start - 0x200) / 0x10), %ax
+    mov     $((stage2_start - 0x200) / 0x10), %ax
     mov     %ax, %ss                        # stack starts right after the boot sector
-    mov     $0x1fe, %sp                     # stack length 512 bytes, will grow down from kernel_start
+    mov     $0x1fe, %sp                     # stack length 512 bytes, will grow down from stage2_start
     sti
     mov     $msg_start, %si
     call    _print
 
     mov     $1, %ax                         # starting at sector 1
-    mov     $1, %si                         # load 1 sector(s)
-    mov     $kernel_start, %bx              # at kernel_start
+    mov     $2, %si                         # load 2 sector(s)
+    mov     $stage2_start, %bx              # at stage2_start
     call    _readsec
-    jnc     _pm
+    jnc     _stage2
 
     mov     $msg_error, %si                 # if error print message and hang
     call    _print
     jmp     _hang
 
-_pm:
+_stage2:
     mov     $msg_ok, %si
     call    _print
-    cli
 
-    call    _check_a20
-    jne     1f
-    mov     $msg_wraps, %si
-    call    _print
-    jmp     2f
-1:
-    mov     $msg_not_wraps, %si
-    call    _print
-    jmp     5f
-2:
-    in      $0x92, %al
-    or      $0x2, %al
-    out     %al, $0x92                      # enable A20 line
+    mov     $stage2_start, %bx
+    jmp     *%bx
 
-    call    _check_a20
-    jne     4f
-    mov     $msg_wraps, %si
-    call    _print
-    jmp     _hang
-4:
-    mov     $msg_not_wraps, %si
-    call    _print
-5:
-
-    lgdt    gdt_desc
-
-    mov     $idt_start, %di
-    mov     $2048, %cx
-    rep     stosb                           # setup empty IDT starting at 0x7400, right up to 0x7c00
-    lidt    idt_desc
-
-    mov     %cr0, %eax
-    or      $1, %ax
-    mov     %eax, %cr0                      # switch to protected mode
-    ljmp    $0x8, $_start32                 # far jump into the code segment (offset 0x8 in the GDT) to reset %cs
-
-.code32
-_start32:
-    mov     $0x10, %ax
-    mov     %ax, %es                        # we need %es for all the stos instructions, but we have no need for %ds, %fs, %gs
-    mov     %ax, %ss                        # point all data segment registers to the data segment (offset 0x10 in the GDT)
-    mov     $(kernel_start - 4), %esp       # stack will grow down from kernel_start, same as in real mode
-
-    
-    movl    $pml4t_start, %edi
-    mov     %edi, %cr3                      # point %cr3 to pml4t
-    xor     %eax, %eax
-    mov     $4096, %ecx
-    rep     stosl                           # clear pml4t + pdpt + pdt + pt (stosl writes 4 bytes at a time, so all 4 tables get cleared)
-
-    mov     %cr3, %edi                      # restore %edi from %cr3, since it was modified by stosl
-    movl    $(pdpt_start + 3), (%edi)       # pml4t[0] -> pdpt[0] + set bits for page is present and writable
-    add     $0x1000, %edi
-    movl    $(pdt_start + 3), (%edi)        # pdpt[0] -> pdt[0] + set bits for page is present and writable
-    add     $0x1000, %edi
-    movl    $(pt_start + 3), (%edi)         # pdt[0] -> pt[0] + set bits for page is present and writable
-    add     $0x1000, %edi
-    mov     $0x3, %ebx
-    mov     $512, %ecx
-1:
-    mov     %ebx, (%edi)                    # pt[i] -> 0x0 + (0x1000 * i) + set bits for page is present and writable
-    add     $0x1000, %ebx
-    add     $8, %edi
-    loop    1b
-
-    mov     %cr4, %eax
-    or      $(1 << 5), %eax
-    mov     %eax, %cr4                      # enable PAE
-
-    mov     $0xc0000080, %ecx
-    rdmsr
-    or      $(1 << 8), %eax
-    wrmsr                                   # set long mode bit
-
-    mov     %cr0, %eax
-    or      $(1 << 31), %eax
-    mov     %eax, %cr0                      # enable paging and get into long mode - compatibility submode
-
-    lgdt    gdt64_desc
-    ljmp    $0x8, $_start64                 # far jump into the code segment (offset 0x8 in the GDT64) to reset %cs and get into long mode - 64bit submode
-
-.code64
-_start64:
-    mov     $idt64_start, %rdi
-    mov     $4096, %rcx
-    rep     stosb                           # setup empty IDT starting at 0x6400, right up to 0x7400
-    lidt    idt64_desc
-
-    mov     $(kernel_start - 4), %rsp       # stack will grow down from kernel_start, same as in real and protected mode
-
-    mov     $kernel_start, %rax
-    jmp     *%rax
-
-.code16
 _hang:
     jmp     _hang
 
@@ -195,109 +97,17 @@ _readsec:
 2:
     ret
 
-# check if memory wraps, if it does than A20 is disabled, otherwise it is enabled
-# write 0x00 at 0x0000:0x0500
-# write 0xff at 0xffff:0x0510
-# compare 0xff with value at 0x0000:0x0500
-# if equal (ZF=1) than memory wraps else (ZF=0) memory does not wrap
-# input: none
-# ouput: ZF - set if memory wraps, clear if memory does not wrap
-#        %ax, %es, %di, %ds, %si are left as they were before call
-_check_a20:
-    push    %es
-    push    %ds
-    xor     %ax, %ax
-    mov     %ax, %es
-    mov     $0x500, %di
-    mov     %es:(%di), %al
-    push    %ax
-    movb    $0x00, %es:(%di)
-    mov     $0xffff, %ax
-    mov     %ax, %ds
-    mov     $0x510, %si
-    mov     %ds:(%si), %al
-    push    %ax
-    movb    $0xff, %ds:(%si)
-    cmpb    $0xff, %es:(%di)
-    pop     %ax
-    mov     %al, %ds:(%si)
-    pop     %ax
-    mov     %al, %es:(%di)
-    pop     %ds
-    pop     %es
-    ret
-
 # data
 msg_start:
-    .asciz "L"                              # loading kernel
+    .asciz "Loading 2nd stage..."           # loading kernel
 msg_ok:
-    .asciz "O"                              # loaded ok
+    .asciz " OK."                           # loaded ok
 msg_error:
-    .asciz "E"                              # error loading
-msg_wraps:
-    .asciz "0"                              # A20 line is disabled
-msg_not_wraps:
-    .asciz "1"                              # A20 line is enabled
+    .asciz " failed."                       # error loading
 sec_per_track:
     .byte 18
 num_heads:
     .byte 2
-
-# global descriptor table
-gdt_start:
-gdt_null:                                   # null segment
-    .quad 0 
-gdt_code:                                   # code segment (selector (offset from gdt_start) = 0x8)
-    .word 0xFFFF                            # limit 4Gb, bits 0..15
-    .word 0                                 # base 0x0, bits 0..15
-    .byte 0                                 # base 0x0, bits 16..23
-    .byte 0b10011010                        # [ present flag = 1 | privilege level = 00 (OS) | type = 1 (code or data) | type = 1 (executable) | conforming = 0 (non-conforming) | readable = 1 | access flag = 0 (set by cpu) ]
-    .byte 0b11001111                        # [ granularity = 1 (multiply by 4k) | size = 1 (32bit) | intel reserved = 0 | ignored = 0 ] + limit 4Gb, bits 16..19
-    .byte 0                                 # base 0x0, bits 24..31
-gdt_data:                                   # data segment (selector (offset from gdt_start) = 0x10)
-    .word 0xFFFF                            # limit 4Gb, bits 0..15
-    .word 0                                 # base 0x0, bits 0..15
-    .byte 0                                 # base 0x0, bits 16..23
-    .byte 0b10010010                        # [ present flag = 1 | privilege level = 00 (OS) | type = 1 (code or data) | type = 0 (data) | expand = 0 (expand down) | writable = 1 | access flag = 0 (set by cpu) ]
-    .byte 0b11001111                        # [ granularity = 1 (multiply by 4k) | big = 1 (allow 4Gb) | intel reserved = 0 | ignored = 0 ] + limit 4Gb, bits 16..19
-    .byte 0                                 # base 0x0, bits 24..31
-gdt_end:
-gdt_desc:
-    .word gdt_end - gdt_start - 1           # limit is (gdt_end - gdt_start - 1), size is (gdt_end - gdt_start), LGDT expects the limit, not the size
-    .long gdt_start
-
-# global descriptor table 64bit
-gdt64_start:
-gdt64_null:                                 # null segment
-    .quad 0
-gdt64_code:                                 # code segment (selector (offset from gdt_start) = 0x8)
-    .word 0                                 # limit 4Gb, bits 0..15
-    .word 0                                 # base 0x0, bits 0..15
-    .byte 0                                 # base 0x0, bits 16..23
-    .byte 0b10011010                        # [ present flag = 1 | privilege level = 00 (OS) | type = 1 (code or data) | type = 1 (executable) | conforming = 0 (non-conforming) | readable = 1 | access flag = 0 (set by cpu) ]
-    .byte 0b10101111                        # [ granularity = 1 (multiply by 4k) | size = 0 (64bit) | 64bit code descriptor = 1 | ignored = 0 ] + limit 4Gb, bits 16..19
-    .byte 0                                 # base 0x0, bits 24..31
-gdt64_data:                                 # data segment (selector (offset from gdt_start) = 0x10)
-    .word 0                                 # limit 4Gb, bits 0..15
-    .word 0                                 # base 0x0, bits 0..15
-    .byte 0                                 # base 0x0, bits 16..23
-    .byte 0b10010010                        # [ present flag = 1 | privilege level = 00 (OS) | type = 1 (code or data) | type = 0 (data) | expand = 0 (expand down) | writable = 1 | access flag = 0 (set by cpu) ]
-    .byte 0b00000000                        # [ granularity = 0 (multiply by 1) | ignored = 0 | intel reserved = 0 | ignored = 0 ] + limit 4Gb, bits 16..19
-    .byte 0                                 # base 0x0, bits 24..31
-gdt64_end:
-gdt64_desc:
-    .word gdt64_end - gdt64_start - 1       # limit is (gdt_end - gdt_start - 1), size is (gdt_end - gdt_start), LGDT expects the limit, not the size
-    .long gdt64_start
-
-# interrupt descriptor table descriptor
-idt_desc:
-    .word 2047                              # limit is 2047, size is 2048
-    .long idt_start
-
-# interrupt descriptor table descriptor 64bit
-idt64_desc:
-    .word 4095                              # limit is 2047, size is 2048
-    .long idt64_start
 
 # fill up the sector
 .fill 510 - (. - _start), 1, 0
