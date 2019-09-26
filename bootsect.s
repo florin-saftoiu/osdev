@@ -110,7 +110,31 @@ num_heads:
     .byte 2
 
 # fill up the sector
-.fill 510 - (. - _start), 1, 0
+.fill 440 - (. - _start), 1, 0
+
+unique_disk_id:
+    .long 0xf41aa958
+reserved:
+    .word 0x0
+
+# partition table
+partition_1:
+    .byte 0x80                              # active
+    .byte 0x2                               # starting head
+    .byte 0x3                               # starting cylinder, bits 8..9 + starting sector
+    .byte 0x0                               # starting cylinder, bits 0..7
+    .byte 0x7                               # type = exFAT
+    .byte 0xe5                              # ending head
+    .byte 0x25                              # ending cylinder, bits 8..9 + ending sector
+    .byte 0x0                               # ending cylinder, bits 0..7
+    .long 0x80                              # relative sector, starting LBA
+    .long 0x3800                            # total sectors in partition
+partition_2:
+    .fill 16, 1, 0
+partition_3:
+    .fill 16, 1, 0
+partition_4:
+    .fill 16, 1, 0
 
 # boot identifier
 .word 0xaa55
