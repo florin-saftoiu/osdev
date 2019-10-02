@@ -11,13 +11,31 @@
 .set idt_start, 0x7400
 .set stage2_start, 0x8000
 .set kernel_start, 0x8400
-_start:
+_start:    
+    push    %dx
+    push    %ax                             # save starting sector of active partition left by bootsect in %dx:%ax
+    push    %cx                             # save drive number left by bootsect in %cl
+    mov     $0x8, %ah
+    mov     %cl, %dl                        # put drive number into %dl
+    xor     %di, %di
+    int     $0x13
+    inc     %dh                             # maximum head number = %dh, number of heads = %dh + 1
+    mov     %dh, %dl
+    xor     %dh, %dh
+    mov     %dx, num_heads
+    and     $0b00111111, %cl                # remove bits 8..9 of maximum cylinder number
+    xor     %ch, %ch
+    mov     %cx, secs_per_track             # maximum sector number = number of sectors per track = bits 0..5 of %cl
+
     mov     $msg_start, %si
     call    _print
 
-    mov     $3, %ax
-    mov     $1, %si
-    mov     $kernel_start, %bx
+    pop     %cx                             # restore drive number left by bootsect in %cl
+    mov     $1, %ch                         # load 1 sector(s)
+    pop     %ax
+    pop     %dx                             # restore starting sector of active partition left by bootsect in %dx:%ax
+    add     $288, %ax                       # starting at sector 416 (%dx:%ax)
+    mov     $kernel_start, %bx              # at kernel_start (%es:%bx)
     call    _readsec
     jnc     _pm
 
@@ -140,36 +158,38 @@ _print:
 1:
     ret
 
-# read from disk into buffer starting at a sector in LBA format
-# input:  %ax - logical sector number of the start sector
-#         %dl - drive number
-#         %si - number of sectors to read
+# read %ch sectors from disk %cl starting at sector %dx:%ax (in LBA format)
+# into buffer starting at %es:%bx
+# input:  %ch - number of sectors to read
+#         %cl - drive number
+#         %dx:%ax - logical sector number of the start sector
 #         %es:%bx - buffer address
-# output: data from logical sector in %ax at memory location %es:%bx
+# output: data from logical sector in %ds:%ax at memory location %es:%bx
 #         CF - set on error
 _readsec:
     mov     $3, %di                         # retry counter
+    push    %cx                             # put number of sectors to read and drive number on stack
+    mov     %sp, %bp                        # save a stack pointer in %bp
 1:
-    push    %bx
-    mov     sec_per_track, %bh
-    div     %bh
-    mov     %ah, %cl
+    divw    secs_per_track
+    mov     %dl, %cl
     inc     %cl                             # %cl = physical sector = LBA sector % sec_per_track + 1
 
-    xor     %ah, %ah
-    mov     num_heads, %bh
-    div     %bh
-    mov     %al, %ch                        # %ch = cylinder = LBA sector / (num_heads * sec_per_track) = (LBA sector / sec_per_track) / num_heads
+    xor     %dx, %dx
+    divw    num_heads
+    mov     %al, %ch                        # %ch = bits 0..7 of cylinder = LBA sector / (num_heads * sec_per_track) = (LBA sector / sec_per_track) / num_heads
+    shl     $6, %ah
+    add     %ah, %cl                        # %cl = bits 8..9 of cylinder + physical sector
 
-    mov     %ah, %dh                        # %dh = head = (LBA sector / sec_per_track) % num_heads
-
-    mov     %si, %ax                        # %al = number of sectors to read
+    mov     %dl, %dh                        # %dh = head = (LBA sector / sec_per_track) % num_heads
+    
+    movb    (%bp), %dl                      # %dl = drive number
+    movb    1(%bp), %al                     # %al = number of sectors to read
 
     mov     $0x2, %ah
-    pop     %bx                             # %es:%bx = destination buffer
     int     $0x13
-    jnc     2f
-    
+    jnc     2f                              # all went well, return
+
     dec     %di
     jz      2f                              # if retry count is 0 give up
     
@@ -177,6 +197,7 @@ _readsec:
     int     $0x13
     jnc     1b
 2:
+    pop     %cx
     ret
 
 # check if memory wraps, if it does than A20 is disabled, otherwise it is enabled
@@ -222,10 +243,10 @@ msg_wraps:
     .asciz "\r\nA20 line disabled."         # A20 line is disabled
 msg_not_wraps:
     .asciz "\r\nA20 line enabled."          # A20 line is enabled
-sec_per_track:
-    .byte 18
+secs_per_track:
+    .word 63
 num_heads:
-    .byte 2
+    .word 16
 
 # global descriptor table
 gdt_start:

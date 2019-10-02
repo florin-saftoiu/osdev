@@ -24,19 +24,52 @@ _start:
     mov     $msg_start, %si
     call    _print
 
-    mov     $1, %ax                         # starting at sector 1
-    mov     $2, %si                         # load 2 sector(s)
-    mov     $stage2_start, %bx              # at stage2_start
+    push    %dx                             # save drive number left by BIOS in %dl
+    mov     $0x8, %ah
+    xor     %di, %di
+    int     $0x13
+    inc     %dh                             # maximum head number = %dh, number of heads = %dh + 1
+    mov     %dh, %dl
+    xor     %dh, %dh
+    mov     %dx, num_heads
+    and     $0b00111111, %cl                # remove bits 8..9 of maximum cylinder number
+    xor     %ch, %ch
+    mov     %cx, secs_per_track             # maximum sector number = number of sectors per track = bits 0..5 of %cl
+    pop     %dx                             # restore drive number left by BIOS in %x
+    push    %dx                             # save drive number left by BIOS in %dl
+
+    mov     $2, %ch                         # load 2 sector(s)
+    mov     %dl, %cl                        # from drive left by BIOS in %dl
+    xor     %dx, %dx
+    mov     $1, %ax                         # starting at sector 1 (%dx:%ax)
+    mov     $stage2_start, %bx              # at stage2_start (%es:%bx)
     call    _readsec
-    jnc     _stage2
+    jnc     _read_pt
 
     mov     $msg_error, %si                 # if error print message and hang
     call    _print
     jmp     _hang
 
-_stage2:
+_read_pt:
     mov     $msg_ok, %si
     call    _print
+
+    mov     $pt, %di
+    mov     $4, %cx
+1:
+    movb    (%di), %al
+    test    $0x80, %al
+    jnz     _stage2
+    add     $16, %di
+    loop    1b
+    mov     $msg_pt_error, %si              # no active partition found
+    call    _print
+    jmp     _hang
+
+_stage2:
+    pop     %cx                             # restore drive number left by BIOS in %dl into %cl
+    movw    8(%di), %ax
+    movw    10(%di), %dx                    # %dx:%ax = starting sector of active partition in LBA format
 
     mov     $stage2_start, %bx
     jmp     *%bx
@@ -58,36 +91,38 @@ _print:
 1:
     ret
 
-# read from disk into buffer starting at a sector in LBA format
-# input:  %ax - logical sector number of the start sector
-#         %dl - drive number
-#         %si - number of sectors to read
+# read %ch sectors from disk %cl starting at sector %dx:%ax (in LBA format)
+# into buffer starting at %es:%bx
+# input:  %ch - number of sectors to read
+#         %cl - drive number
+#         %dx:%ax - logical sector number of the start sector
 #         %es:%bx - buffer address
-# output: data from logical sector in %ax at memory location %es:%bx
+# output: data from logical sector in %ds:%ax at memory location %es:%bx
 #         CF - set on error
 _readsec:
     mov     $3, %di                         # retry counter
+    push    %cx                             # put number of sectors to read and drive number on stack
+    mov     %sp, %bp                        # save a stack pointer in %bp
 1:
-    push    %bx
-    mov     sec_per_track, %bh
-    div     %bh
-    mov     %ah, %cl
+    divw    secs_per_track
+    mov     %dl, %cl
     inc     %cl                             # %cl = physical sector = LBA sector % sec_per_track + 1
 
-    xor     %ah, %ah
-    mov     num_heads, %bh
-    div     %bh
-    mov     %al, %ch                        # %ch = cylinder = LBA sector / (num_heads * sec_per_track) = (LBA sector / sec_per_track) / num_heads
+    xor     %dx, %dx
+    divw    num_heads
+    mov     %al, %ch                        # %ch = bits 0..7 of cylinder = LBA sector / (num_heads * sec_per_track) = (LBA sector / sec_per_track) / num_heads
+    shl     $6, %ah
+    add     %ah, %cl                        # %cl = bits 8..9 of cylinder + physical sector
 
-    mov     %ah, %dh                        # %dh = head = (LBA sector / sec_per_track) % num_heads
-
-    mov     %si, %ax                        # %al = number of sectors to read
+    mov     %dl, %dh                        # %dh = head = (LBA sector / sec_per_track) % num_heads
+    
+    movb    (%bp), %dl                      # %dl = drive number
+    movb    1(%bp), %al                     # %al = number of sectors to read
 
     mov     $0x2, %ah
-    pop     %bx                             # %es:%bx = destination buffer
     int     $0x13
-    jnc     2f
-    
+    jnc     2f                              # all went well, return
+
     dec     %di
     jz      2f                              # if retry count is 0 give up
     
@@ -95,19 +130,22 @@ _readsec:
     int     $0x13
     jnc     1b
 2:
+    pop     %cx
     ret
 
 # data
 msg_start:
-    .asciz "Loading 2nd stage..."           # loading kernel
+    .asciz "Loading 2nd stage..."
 msg_ok:
-    .asciz " OK."                           # loaded ok
+    .asciz " OK."
 msg_error:
-    .asciz " failed."                       # error loading
-sec_per_track:
-    .byte 18
+    .asciz " failed."
+msg_pt_error:
+    .asciz "\r\nError reading partition table."
+secs_per_track:
+    .word 63
 num_heads:
-    .byte 2
+    .word 16
 
 # fill up the sector
 .fill 440 - (. - _start), 1, 0
@@ -118,7 +156,7 @@ reserved:
     .word 0x0
 
 # partition table
-partition_1:
+pt:
     .byte 0x80                              # active
     .byte 0x2                               # starting head
     .byte 0x3                               # starting cylinder, bits 8..9 + starting sector
@@ -129,12 +167,9 @@ partition_1:
     .byte 0x0                               # ending cylinder, bits 0..7
     .long 0x80                              # relative sector, starting LBA
     .long 0x3800                            # total sectors in partition
-partition_2:
-    .fill 16, 1, 0
-partition_3:
-    .fill 16, 1, 0
-partition_4:
-    .fill 16, 1, 0
+    .fill 16, 1, 0                          # partition 2
+    .fill 16, 1, 0                          # partition 3
+    .fill 16, 1, 0                          # partition 4
 
 # boot identifier
 .word 0xaa55
