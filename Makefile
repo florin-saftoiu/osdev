@@ -33,13 +33,13 @@ drive_c.vhd: bootsect.bin stage2.bin krnl.bin
 	VBoxManage storageattach bootsect --storagectl IDE --port 0 --device 0 --type hdd --medium drive_c.vhd
 
 %.bin: %.tmp
-	objcopy -O binary -j .text $< $@
+	x86_64-elf-objcopy -O binary -j .text $< $@
 
 %.tmp: %.o
-	ld -T NUL -Ttext=${${basename $@}_offset} -o $@ $<
+	x86_64-elf-ld -T NUL -Ttext=${${basename $@}_offset} -o $@ $<
 
 %.o: %.s
-	as -o $@ $<
+	x86_64-elf-as --divide -o $@ $<
 
 %.o: %.c
 	x86_64-elf-gcc -c $< -o $@ -ffreestanding -O2 -Wall -Wextra
