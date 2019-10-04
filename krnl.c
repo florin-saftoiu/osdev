@@ -1,5 +1,5 @@
 // x86_64-elf-gcc -c krnl.c -o krnl.o -ffreestanding -O2 -Wall -Wextra
-// x86_64-elf-ld -T NUL -Ttext=0x8400 -o krnl.tmp krnl.o
+// x86_64-elf-ld -T NUL -Ttext=0x8a00 -o krnl.tmp krnl.o
 // x86_64-elf-objcopy -O binary -j .text krnl.tmp krnl.bin
 // dd if=krnl.bin of=drive.img seek=3 bs=512 conv=notrunc
 #include <stdint.h>

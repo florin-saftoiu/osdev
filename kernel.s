@@ -1,5 +1,5 @@
 # as kernel.s -o kernel.o
-# ld -T NUL -Ttext=0x8400 -o kernel.tmp kernel.o
+# ld -T NUL -Ttext=0x8a00 -o kernel.tmp kernel.o
 # objcopy -O binary -j .text kernel.tmp kernel.bin
 # dd if=kernel.bin of=drive.img seek=3 bs=512 conv=notrunc
 .code64
@@ -14,3 +14,6 @@ _kstart:
 
 _kend:
     jmp     _kend
+
+# fill up more than 1 cluster
+.fill 1200, 4, 0x6e72656b

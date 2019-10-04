@@ -9,8 +9,8 @@ BINS:=$(TMPS:%.tmp=%.bin)
 
 bootsect_offset:=0x7c00
 stage2_offset:=0x8000
-kernel_offset:=0x8400
-krnl_offset:=0x8400
+kernel_offset:=0x8a00
+krnl_offset:=0x8a00
 
 .PRECIOUS: ${TMPS} ${OBJS} # keep the intermediate files for debugging
 
@@ -20,7 +20,7 @@ drive.vhd: bootsect.bin stage2.bin kernel.bin
 	-VBoxManage storageattach bootsect --storagectl IDE --port 0 --device 0 --type hdd --medium none
 	-VBoxManage closemedium drive.vhd --delete
 	powershell '$$ps = Start-Process -FilePath powershell -ArgumentList "$$(Get-Location)\create_vhd.ps1", drive.vhd, kernel.bin -Verb RunAs -PassThru; $$ps.WaitForExit(); exit $$ps.ExitCode'
-	dd if=bootsect.bin of=drive.vhd seek=0 bs=512 conv=notrunc
+	dd if=bootsect.bin of=drive.vhd bs=440 count=1 conv=notrunc
 	dd if=stage2.bin of=drive.vhd seek=1 bs=512 conv=notrunc
 	VBoxManage storageattach bootsect --storagectl IDE --port 0 --device 0 --type hdd --medium drive.vhd
 
@@ -28,7 +28,7 @@ drive_c.vhd: bootsect.bin stage2.bin krnl.bin
 	-VBoxManage storageattach bootsect --storagectl IDE --port 0 --device 0 --type hdd --medium none
 	-VBoxManage closemedium drive_c.vhd --delete
 	powershell '$$ps = Start-Process -FilePath powershell -ArgumentList "$$(Get-Location)\create_vhd.ps1", drive_c.vhd, krnl.bin -Verb RunAs -PassThru; $$ps.WaitForExit(); exit $$ps.ExitCode'
-	dd if=bootsect.bin of=drive_c.vhd seek=0 bs=512 conv=notrunc
+	dd if=bootsect.bin of=drive_c.vhd bs=440 count=1 conv=notrunc
 	dd if=stage2.bin of=drive_c.vhd seek=1 bs=512 conv=notrunc
 	VBoxManage storageattach bootsect --storagectl IDE --port 0 --device 0 --type hdd --medium drive_c.vhd
 
@@ -47,4 +47,5 @@ drive_c.vhd: bootsect.bin stage2.bin krnl.bin
 clean:
 	-VBoxManage storageattach bootsect --storagectl IDE --port 0 --device 0 --type hdd --medium none
 	-VBoxManage closemedium drive.vhd --delete
+	-VBoxManage closemedium drive_c.vhd --delete
 	-powershell Remove-Item -ErrorAction Ignore drive.vhd, drive_c.vhd, $(subst $(SPACE),$(COMMA),$(BINS)), $(subst $(SPACE),$(COMMA),$(TMPS)), $(subst $(SPACE),$(COMMA),$(OBJS))

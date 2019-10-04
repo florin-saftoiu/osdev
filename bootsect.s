@@ -24,6 +24,7 @@ _start:
     mov     $msg_start, %si
     call    _print
 
+    xor     %dh, %dh
     push    %dx                             # save drive number left by BIOS in %dl
     mov     $0x8, %ah
     xor     %di, %di
@@ -35,10 +36,10 @@ _start:
     and     $0b00111111, %cl                # remove bits 8..9 of maximum cylinder number
     xor     %ch, %ch
     mov     %cx, secs_per_track             # maximum sector number = number of sectors per track = bits 0..5 of %cl
-    pop     %dx                             # restore drive number left by BIOS in %x
+    pop     %dx                             # restore drive number left by BIOS in %dl into %dx
     push    %dx                             # save drive number left by BIOS in %dl
 
-    mov     $2, %ch                         # load 2 sector(s)
+    mov     $3, %ch                         # load 3 sector(s)
     mov     %dl, %cl                        # from drive left by BIOS in %dl
     xor     %dx, %dx
     mov     $1, %ax                         # starting at sector 1 (%dx:%ax)
@@ -67,7 +68,7 @@ _read_pt:
     jmp     _hang
 
 _stage2:
-    pop     %cx                             # restore drive number left by BIOS in %dl into %cl
+    pop     %cx                             # restore drive number left by BIOS in %dl into %cx
     movw    8(%di), %ax
     movw    10(%di), %dx                    # %dx:%ax = starting sector of active partition in LBA format
 

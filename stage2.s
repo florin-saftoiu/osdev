@@ -10,13 +10,20 @@
 .set idt64_start, 0x6400
 .set idt_start, 0x7400
 .set stage2_start, 0x8000
-.set kernel_start, 0x8400
-_start:    
-    push    %dx
-    push    %ax                             # save starting sector of active partition left by bootsect in %dx:%ax
-    push    %cx                             # save drive number left by bootsect in %cl
+.set exfat_start, 0x8600
+.set fat_region_start, 0x8800
+.set root_directory_start, 0x8a00
+.set kernel_start, 0x8a00
+_start:
+    push    %cx                             # 4(%bp) = drive number passed by bootsect in %cx
+    push    %dx                             # 2(%bp) = high byte of starting sector of active partition passed by bootsect in %dx:%ax
+    push    %ax                             # (%bp) = low byte of starting sector of active partition passed by bootsect in %dx:%ax
+    mov     %sp, %bp
+    push    $exfat_start                    # -2(%bp) = current memory offset
+    sub     $8, %sp                         # -6(%bp):-4(%bp) = current cluster, -8(%bp) = index of current cluster in the current fat region sector, -10(%bp) = kernel length in sectors
+
     mov     $0x8, %ah
-    mov     %cl, %dl                        # put drive number into %dl
+    mov     4(%bp), %dl                     # put drive number into %dl
     xor     %di, %di
     int     $0x13
     inc     %dh                             # maximum head number = %dh, number of heads = %dh + 1
@@ -30,18 +37,232 @@ _start:
     mov     $msg_start, %si
     call    _print
 
-    pop     %cx                             # restore drive number left by bootsect in %cl
     mov     $1, %ch                         # load 1 sector(s)
-    pop     %ax
-    pop     %dx                             # restore starting sector of active partition left by bootsect in %dx:%ax
-    add     $288, %ax                       # starting at sector 416 (%dx:%ax)
-    mov     $kernel_start, %bx              # at kernel_start (%es:%bx)
+    mov     4(%bp), %cl                     # from drive left by bootsect
+    mov     2(%bp), %dx
+    mov     (%bp), %ax                      # starting at starting sector of active partition passed by bootsect
+    mov     -2(%bp), %bx                    # at current memory offset (%es:%bx)
     call    _readsec
-    jnc     _pm
+    jnc     _exfat
 
     mov     $msg_error, %si
     call    _print
     jmp     _hang
+
+_exfat:
+    addw    $0x200, -2(%bp)                 # increment current memory offset by 1 sector
+
+_fat_region:
+    addw    $0x200, -2(%bp)                 # increment current memory offset by 1 sector
+    
+    mov     (exfat_start + 96), %ax
+    mov     (exfat_start + 98), %dx         # %dx:%ax = first cluster of root directory
+1:
+    mov     %ax, -6(%bp)
+    mov     %dx, -4(%bp)                    # current cluster = %dx:%ax
+
+    clc
+    sbb     $2, %ax
+    sbb     $0, %dx                         # %dx:%ax = index of current cluster of root directory inside cluster heap
+
+    movzbw  (exfat_start + 109), %cx        # do index * 2 ^ sectors_per_cluster_shift by shifting sectors_per_cluster_shift times
+2:
+    shl     %dx                             # shift high word
+    shl     %ax                             # shift low word
+    jnc     3f                              # if CF = 0 go to next shift
+    or      $1, %dx                         # else put CF into the least significant bit of high word
+3:
+    loop    2b                              # %dx:%ax = current cluster of root directory offset in sectors
+
+    clc
+    adc     (exfat_start + 64), %ax
+    adc     (exfat_start + 66), %dx         # %dx:%ax = current cluster of root directory offset in sectors + partition offset in sectors
+
+    clc
+    adc     (exfat_start + 88), %ax
+    adc     (exfat_start + 90), %dx         # %dx:%ax = current cluster of root directory offset in sectors + partition offset in sectors + cluster heap offset in sectors
+
+    mov     $1, %ch
+    mov     (exfat_start + 109), %cl
+    shl     %cl, %ch                        # %ch = 2 ^ sectors_per_cluster_shift, number of sectors per cluster
+    mov     4(%bp), %cl                     # from drive left by bootsect
+    mov     -2(%bp), %bx                    # at current memory offset (%es:%bx)
+    call    _readsec
+    jnc     4f
+
+    mov     $msg_error, %si
+    call    _print
+    jmp     _hang
+
+4:
+    mov     $1, %ax
+    mov     (exfat_start + 109), %cl
+    shl     %cl, %ax                        # %ax = 2 ^ sectors_per_cluster_shift, number of sectors per cluster
+    shl     $9, %ax                         # multiply %ax by 2^9 (512)
+    add     %ax, -2(%bp)                    # increment current memory offset by 2 ^ sectors_per_cluster_shift, number of sectors per cluster sector(s)
+
+    mov     -6(%bp), %ax
+    mov     -4(%bp), %dx
+    mov     $128, %bx
+    div     %bx
+    mov     %dx, -8(%bp)
+    xor     %dx, %dx                        # %dx:%ax = sector of the fat region that has the current cluster, -8(%bp) = index of current cluster in that sector
+
+    clc
+    adc     (exfat_start + 80), %ax
+    adc     (exfat_start + 82), %dx         # %dx:%ax = fat region offset in sectors + fat offset in sectors
+
+    clc
+    adc     (exfat_start + 64), %ax
+    adc     (exfat_start + 66), %dx         # %dx:%ax = fat region offset in sectors + fat offset in sectors + partition offset in sectors
+
+    mov     $1, %ch                         # load 1 sector
+    mov     4(%bp), %cl                     # from drive left by bootsect
+    mov     $fat_region_start, %bx          # at fat_region_start (%es:%bx)
+    call    _readsec
+    jnc     5f
+
+    mov     $msg_error, %si
+    call    _print
+    jmp     _hang
+
+5:
+    mov     -8(%bp), %di
+    shl     $2, %di                         # multiply index in %di by 4 to get the offset
+    mov     (%bx, %di), %ax
+    mov     2(%bx, %di), %dx
+    cmp     $0xffff, %ax
+    jne     1b
+    cmp     $0xffff, %dx
+    jne     1b
+
+_root_directory:
+    mov     $root_directory_start, %bx
+    xor     %di, %di
+1:
+    mov     (%bx, %di), %al                 # read 1st byte of directory entry
+    add     $32, %di                        # advance to next entry
+    cmp     $0, %al                         # if 1st byte is 0 than error
+    jne     2f
+
+    mov     $msg_error, %si
+    call    _print
+    jmp     _hang
+
+2:
+    cmp     $0x85, %al                      # if 1st byte is 0x85 it's a file directory entry
+    jne     1b                              # else read next entry
+
+    push    %di                             # save pointer to next directory entry
+    
+    mov     $20, %cx
+    add     $34, %di
+    add     $root_directory_start, %di
+    mov     $kernel_filename, %si           # compare filename to 'kernel.bin'
+3:
+    cmpsb
+    jne     5f                              # if different restore pointer to next entry and advance to it
+    loop    3b
+    
+    pop     %di                             # it's the kernel
+
+    mov     8(%bx, %di), %ax
+    mov     10(%bx, %di), %dx               # put it's data length in bytes in %dx:%ax
+    mov     $512, %cx
+    div     %cx
+    cmp     $0, %dx
+    je      4f
+    inc     %ax
+4:
+    mov     %ax, -10(%bp)                   # put it's data length in sectors in -10(%bp)
+
+    mov     20(%bx, %di), %ax
+    mov     22(%bx, %di), %dx               # put it's cluster number in %dx:%ax
+    jmp     _kernel
+
+5:
+    pop     %di
+    jmp     1b
+
+_kernel:
+    movw    $kernel_start, -2(%bp)          # set current memory offset to kernel_start
+1:
+    mov     %ax, -6(%bp)
+    mov     %dx, -4(%bp)                    # current cluster = %dx:%ax
+
+    clc
+    sbb     $2, %ax
+    sbb     $0, %dx                         # %dx:%ax = index of current cluster of kernel inside cluster heap
+
+    movzbw  (exfat_start + 109), %cx        # do index * 2 ^ sectors_per_cluster_shift by shifting sectors_per_cluster_shift times
+2:
+    shl     %dx                             # shift high word
+    shl     %ax                             # shift low word
+    jnc     3f                              # if CF = 0 go to next shift
+    or      $1, %dx                         # else put CF into the least significant bit of high word
+3:
+    loop    2b                              # %dx:%ax = current cluster of kernel offset in sectors
+
+    clc
+    adc     (exfat_start + 64), %ax
+    adc     (exfat_start + 66), %dx         # %dx:%ax = current cluster of kernel offset in sectors + partition offset in sectors
+
+    clc
+    adc     (exfat_start + 88), %ax
+    adc     (exfat_start + 90), %dx         # %dx:%ax = current cluster of kernel offset in sectors + partition offset in sectors + cluster heap offset in sectors
+
+    mov     -10(%bp), %ch                   # load full kernel length 
+    mov     4(%bp), %cl                     # from drive left by bootsect
+    mov     -2(%bp), %bx                    # at current memory offset (%es:%bx)
+    call    _readsec
+    jnc     _pm                             # consider that the kernel is in continous sectors
+    # jnc     4f
+
+    mov     $msg_error, %si
+    call    _print
+    jmp     _hang
+
+4:
+    mov     $1, %ax
+    mov     (exfat_start + 109), %cl
+    shl     %cl, %ax                        # %ax = 2 ^ sectors_per_cluster_shift, number of sectors per cluster
+    shl     $9, %ax                         # multiply %ax by 2^9 (512)
+    add     %ax, -2(%bp)                    # increment current memory offset by 2 ^ sectors_per_cluster_shift, number of sectors per cluster sector(s)
+
+    mov     -6(%bp), %ax
+    mov     -4(%bp), %dx
+    mov     $128, %bx
+    div     %bx
+    mov     %dx, -8(%bp)
+    xor     %dx, %dx                        # %dx:%ax = sector of the fat region that has the current cluster, -8(%bp) = index of current cluster in that sector
+
+    clc
+    adc     (exfat_start + 80), %ax
+    adc     (exfat_start + 82), %dx         # %dx:%ax = fat region offset in sectors + fat offset in sectors
+
+    clc
+    adc     (exfat_start + 64), %ax
+    adc     (exfat_start + 66), %dx         # %dx:%ax = fat region offset in sectors + fat offset in sectors + partition offset in sectors
+
+    mov     $1, %ch                         # load 1 sector
+    mov     4(%bp), %cl                     # from drive left by bootsect
+    mov     $fat_region_start, %bx          # at fat_region_start (%es:%bx)
+    call    _readsec
+    jnc     5f
+
+    mov     $msg_error, %si
+    call    _print
+    jmp     _hang
+
+5:
+    mov     -8(%bp), %di
+    shl     $2, %di                         # multiply index in %di by 4 to get the offset
+    mov     (%bx, %di), %ax
+    mov     2(%bx, %di), %dx
+    cmp     $0xffff, %ax
+    jne     1b
+    cmp     $0xffff, %dx
+    jne     1b
 
 _pm:
     mov     $msg_ok, %si
@@ -167,6 +388,7 @@ _print:
 # output: data from logical sector in %ds:%ax at memory location %es:%bx
 #         CF - set on error
 _readsec:
+    push    %bp
     mov     $3, %di                         # retry counter
     push    %cx                             # put number of sectors to read and drive number on stack
     mov     %sp, %bp                        # save a stack pointer in %bp
@@ -198,6 +420,7 @@ _readsec:
     jnc     1b
 2:
     pop     %cx
+    pop     %bp
     ret
 
 # check if memory wraps, if it does than A20 is disabled, otherwise it is enabled
@@ -247,6 +470,8 @@ secs_per_track:
     .word 63
 num_heads:
     .word 16
+kernel_filename:
+    .asciz "k\000e\000r\000n\000e\000l\000.\000b\000i\000n\000"
 
 # global descriptor table
 gdt_start:

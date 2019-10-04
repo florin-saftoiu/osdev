@@ -6,12 +6,15 @@ param(
 if ($LASTEXITCODE -eq 0) {
     $ErrorActionPreference = "Stop"
     $img = Mount-DiskImage -ImagePath "$PSScriptRoot\$filename" -PassThru -NoDriveLetter
-    Initialize-Disk -Number $img.Number
-    $part = New-Partition -DiskNumber $img.Number -UseMaximumSize
+    Initialize-Disk -Number $img.Number -PartitionStyle MBR
+    $part = New-Partition -DiskNumber $img.Number -UseMaximumSize -IsActive
     Format-Volume -Partition $part -FileSystem exFAT -NewFileSystemLabel "OSDEV" -Full -Force
     New-Item -ItemType Directory -Path "$PSScriptRoot\mnt_$filename"
     Add-PartitionAccessPath -DiskNumber $img.Number -PartitionNumber 1 -AccessPath "$PSScriptRoot\mnt_$filename"
-    Copy-Item -Path "$PSScriptRoot\$kernel" -Destination "$PSScriptRoot\mnt_$filename"
+    Copy-Item -Path "$PSScriptRoot\$kernel" -Destination "$PSScriptRoot\mnt_$filename\kernel.bin"
+    for ($i = 0; $i -lt 43; $i++) {
+        New-Item -ItemType file -Path "$PSScriptRoot\mnt_$filename\file_$i.txt"
+    }
     Dismount-DiskImage -InputObject $img
     Remove-Item -Force -Path "$PSScriptRoot\mnt_$filename"
 } else {
