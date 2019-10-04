@@ -13,7 +13,7 @@
 .set exfat_start, 0x8600
 .set fat_region_start, 0x8800
 .set root_directory_start, 0x8a00
-.set kernel_start, 0x8a00
+.set kernel_start, 0x9000
 _start:
     push    %cx                             # 4(%bp) = drive number passed by bootsect in %cx
     push    %dx                             # 2(%bp) = high byte of starting sector of active partition passed by bootsect in %dx:%ax
