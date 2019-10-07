@@ -185,7 +185,7 @@ _root_directory:
     jmp     1b
 
 _kernel:
-    movw    $kernel_start, -2(%bp)          # set current memory offset to kernel_start
+    movw    $(kernel_start-0x80), -2(%bp)   # set current memory offset to kernel_start
 1:
     mov     %ax, -6(%bp)
     mov     %dx, -4(%bp)                    # current cluster = %dx:%ax
