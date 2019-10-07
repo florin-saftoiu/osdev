@@ -11,9 +11,13 @@ Requirements
 
 TODO
 ====
-1. load 2nd stage and kernel from exfat
-2. load kernel as ELF64 file
-3. write strings to video memory
-4. write CRLF to video memory
-5. scroll screen
-6. beyond ...
+1. kernel in non contiguous exfat clusters
+2. load all segments of ELF64 kernel at the right place
+3. use int 13h extended read
+4. write strings to video memory
+5. write CRLF to video memory
+6. scroll screen
+7. higher half
+8. paging
+9. disk driver
+10. beyond ...
