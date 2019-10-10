@@ -11,12 +11,30 @@ Requirements
 
 TODO
 ====
-1. load all segments of ELF64 kernel at the right place
-2. use int 13h extended read
-3. write strings to video memory
-4. write CRLF to video memory
-5. scroll screen
-6. higher half
-7. paging
-8. disk driver
-9. beyond ...
+1. write strings to video memory
+2. write CRLF to video memory
+3. scroll screen
+4. higher half
+5. paging
+6. disk driver
+7. use int 13h extended read
+8. beyond ...
+
+
+x86_64 address space
+====================
+```
+11111111 11111111 11111111 11111111 11111111 11111111 11111111 11111111
+      FF       FF       FF       FF       FF       FF       FF       FF = 0xFFFFFFFFFFFFFFFF \
+........ ........ ........ ........ ........ ........ ........ ........     ................  = 0x7FFFFFFFFFFF ~= 128 Tb \
+      FF       FF       80       00       00       00       00       00 = 0xFFFF800000000000 /                            \
+11111111 11111111 10000000 00000000 00000000 00000000 00000000 00000000                                                    \
+                                                                                                                            \
+-----------------------------------------------------------------------                                                      = 0xFFFFFFFFFFFE ~= 256 Tb
+                                                                                                                            /
+00000000 00000000 01111111 11111111 11111111 11111111 11111111 11111111                                                    /
+      00       00       7F       FF       FF       FF       FF       FF = 0x00007FFFFFFFFFFF \                            /
+........ ........ ........ ........ ........ ........ ........ ........     ................  = 0x7FFFFFFFFFFF ~= 128 Tb /
+      00       00       00       00       00       00       00       00 = 0x0000000000000000 /
+00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+```

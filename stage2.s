@@ -13,7 +13,7 @@
 .set exfat_start, 0x8600
 .set fat_region_start, 0x8800
 .set root_directory_start, 0x8a00
-.set kernel_start, 0x9000
+.set kernel_start, 0x8a00
 _start:
     push    %cx                             # 4(%bp) = drive number passed by bootsect in %cx
     push    %dx                             # 2(%bp) = high byte of starting sector of active partition passed by bootsect in %dx:%ax
@@ -191,7 +191,7 @@ _root_directory:
     jmp     1b
 
 _kernel:
-    movw    $(kernel_start-0x80), -2(%bp)   # set current memory offset to kernel_start
+    movw    $kernel_start, -2(%bp)          # set current memory offset to kernel_start
 1:
     mov     %ax, -6(%bp)
     mov     %dx, -4(%bp)                    # current cluster = %dx:%ax
@@ -274,7 +274,7 @@ _kernel:
     mov     $msg_error, %si
     call    _print
     jmp     _hang
-
+                        
 6:
     mov     -8(%bp), %di
     shl     $2, %di                         # multiply index in %di by 4 to get the offset
@@ -352,7 +352,7 @@ _start32:
     mov     %ebx, (%edi)                    # pt[i] -> 0x0 + (0x1000 * i) + set bits for page is present and writable
     add     $0x1000, %ebx
     add     $8, %edi
-    loop    1b
+    loop    1b                              # this identity maps the first 2 Mb of virtual space to the first 2Mb of physical space
 
     mov     %cr4, %eax
     or      $(1 << 5), %eax
@@ -379,7 +379,34 @@ _start64:
 
     mov     $(stage2_start - 4), %rsp       # stack will grow down from stage2_start, same as in real and protected mode
 
-    mov     $kernel_start, %rax
+    # move kernel 0x100000 = 1Mb
+    mov     $kernel_start, %rbx
+    add     (kernel_start + 32), %rbx       # program header offset
+    movzwq  (kernel_start + 56), %rcx       # number of entries in program header
+1:
+    mov     (%rbx), %eax                    # move p_type into %eax
+    cmp     $1, %eax                        # if p_type = 1 then it's a LOAD segment
+    jne     2f                              # else move to next segment
+    push    %rcx
+
+    mov     16(%rbx), %rdi                  # p_vaddr in %rdi
+    mov     40(%rbx), %rcx                  # p_memsz in %rcx
+    rep     stosb                           # clear p_memsz bytes at p_vaddr
+
+    mov     $kernel_start, %rsi
+    xor     %rax, %rax
+    mov     8(%rbx), %eax
+    add     %rax, %rsi                      # kernel_offset + p_offset in %rsi
+    mov     16(%rbx), %rdi                  # p_vaddr in %rdi
+    mov     32(%rbx), %rcx                  # p_filesz in %rcx
+    rep     movsb                           # copy p_filesz bytes from kernel_offset + p_offset to p_vaddr
+    
+    pop     %rcx
+2:
+    add     $56, %rbx                       # move to next segment
+    loop    1b
+    
+    mov     (kernel_start + 24), %rax       # program entry address
     jmp     *%rax
 
 .code16
