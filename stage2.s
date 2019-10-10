@@ -20,7 +20,10 @@ _start:
     push    %ax                             # (%bp) = low byte of starting sector of active partition passed by bootsect in %dx:%ax
     mov     %sp, %bp
     push    $exfat_start                    # -2(%bp) = current memory offset
-    sub     $8, %sp                         # -6(%bp):-4(%bp) = current cluster, -8(%bp) = index of current cluster in the current fat region sector, -10(%bp) = kernel length in sectors
+    sub     $10, %sp                        # -6(%bp):-4(%bp) = current cluster
+                                            # -8(%bp) = index of current cluster in the current fat region sector
+                                            # -10(%bp) = kernel length in sectors
+                                            # -12(%bp) = kernel general secondary flags
 
     mov     $0x8, %ah
     mov     4(%bp), %dl                     # put drive number into %dl
@@ -165,7 +168,7 @@ _root_directory:
     loop    3b
     
     pop     %di                             # it's the kernel
-
+    
     mov     8(%bx, %di), %ax
     mov     10(%bx, %di), %dx               # put it's data length in bytes in %dx:%ax
     mov     $512, %cx
@@ -175,6 +178,9 @@ _root_directory:
     inc     %ax
 4:
     mov     %ax, -10(%bp)                   # put it's data length in sectors in -10(%bp)
+
+    movzbw  1(%bx, %di), %ax                # put it's general secondary flags in %ax
+    mov     %ax, -12(%bp)                   # put it's general secondary flags in -12(%bp)
 
     mov     20(%bx, %di), %ax
     mov     22(%bx, %di), %dx               # put it's cluster number in %dx:%ax
@@ -211,18 +217,33 @@ _kernel:
     adc     (exfat_start + 88), %ax
     adc     (exfat_start + 90), %dx         # %dx:%ax = current cluster of kernel offset in sectors + partition offset in sectors + cluster heap offset in sectors
 
-    mov     -10(%bp), %ch                   # load full kernel length 
+    testw   $2, -12(%bp)                    # test NoFatChain bit
+    jz      4f                              # if not set than it's a cluster chain, else read full kernel length in one shot
+
+    mov     -10(%bp), %ch                   # load full kernel length
     mov     4(%bp), %cl                     # from drive left by bootsect
     mov     -2(%bp), %bx                    # at current memory offset (%es:%bx)
     call    _readsec
     jnc     _pm                             # consider that the kernel is in continous sectors
-    # jnc     4f
 
     mov     $msg_error, %si
     call    _print
     jmp     _hang
 
 4:
+    mov     $1, %ch
+    mov     (exfat_start + 109), %cl
+    shl     %cl, %ch                        # %ch = 2 ^ sectors_per_cluster_shift, number of sectors per cluster 
+    mov     4(%bp), %cl                     # from drive left by bootsect
+    mov     -2(%bp), %bx                    # at current memory offset (%es:%bx)
+    call    _readsec
+    jnc     5f
+
+    mov     $msg_error, %si
+    call    _print
+    jmp     _hang
+
+5:
     mov     $1, %ax
     mov     (exfat_start + 109), %cl
     shl     %cl, %ax                        # %ax = 2 ^ sectors_per_cluster_shift, number of sectors per cluster
@@ -248,13 +269,13 @@ _kernel:
     mov     4(%bp), %cl                     # from drive left by bootsect
     mov     $fat_region_start, %bx          # at fat_region_start (%es:%bx)
     call    _readsec
-    jnc     5f
+    jnc     6f
 
     mov     $msg_error, %si
     call    _print
     jmp     _hang
 
-5:
+6:
     mov     -8(%bp), %di
     shl     $2, %di                         # multiply index in %di by 4 to get the offset
     mov     (%bx, %di), %ax
