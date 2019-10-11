@@ -3,7 +3,7 @@ SPACE:=$(EMPTY) $(EMPTY)
 COMMA:=, $(EMPTY)
 
 S_SRCS:=bootsect.s stage2.s
-C_SRCS:=kernel.c vga.c
+C_SRCS:=kernel.c string.c vga.c term.c
 S_OBJS:=$(S_SRCS:%.s=%.o)
 C_OBJS:=$(C_SRCS:%.c=%.o)
 S_TMPS:=$(S_OBJS:%.o=%.tmp)
