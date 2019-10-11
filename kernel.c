@@ -18,6 +18,7 @@ void kmain(void) {
     term_write((char*) &other);
     term_write((char*) &more);
     term_write(&big_string[4000]);
+    term_write(" new\nline");
     
     while (1) {}
 }

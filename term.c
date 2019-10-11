@@ -24,11 +24,16 @@ void term_setcolors(enum vga_color fg, enum vga_color bg) {
 }
 
 static void term_putch(unsigned char uc) {
-    vga_putch(uc, term_fg, term_bg, term_x, term_y);
-    term_x += 1;
-    if (term_x == VGA_WIDTH) {
-        term_y += 1;
+    if (uc == '\n') {
         term_x = 0;
+        term_y += 1;
+    } else {
+        vga_putch(uc, term_fg, term_bg, term_x, term_y);
+        term_x += 1;
+        if (term_x == VGA_WIDTH) {
+            term_y += 1;
+            term_x = 0;
+        }
     }
 }
 

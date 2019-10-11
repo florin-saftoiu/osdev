@@ -11,13 +11,12 @@ Requirements
 
 TODO
 ====
-1. write CRLF to video memory
-2. scroll screen
-3. higher half
-4. paging
-5. disk driver
-6. use int 13h extended read
-7. beyond ...
+1. scroll screen
+2. higher half
+3. paging
+4. disk driver
+5. use int 13h extended read
+6. beyond ...
 
 
 x86_64 address space
