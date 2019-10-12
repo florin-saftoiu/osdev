@@ -11,12 +11,11 @@ Requirements
 
 TODO
 ====
-1. scroll screen
-2. higher half
-3. paging
-4. disk driver
-5. use int 13h extended read
-6. beyond ...
+1. higher half
+2. paging
+3. disk driver
+4. use int 13h extended read
+5. beyond ...
 
 
 x86_64 address space

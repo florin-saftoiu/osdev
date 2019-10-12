@@ -18,7 +18,30 @@ void kmain(void) {
     term_write((char*) &other);
     term_write((char*) &more);
     term_write(&big_string[4000]);
-    term_write(" new\nline");
+    term_write(" new\nline\n");
+    term_write("3\n");
+    term_write("4\n");
+    term_write("5\n");
+    term_write("6\n");
+    term_write("7\n");
+    term_write("8\n");
+    term_write("9\n");
+    term_write("10\n");
+    term_write("11\n");
+    term_write("12\n");
+    term_write("13\n");
+    term_write("14\n");
+    term_write("15\n");
+    term_write("16\n");
+    term_write("17\n");
+    term_write("18\n");
+    term_write("19\n");
+    term_write("20\n");
+    term_write("21\n");
+    term_write("22\n");
+    term_write("23\n");
+    term_write("24\n");
+    term_write("25_scrolled");
     
     while (1) {}
 }
