@@ -16,14 +16,21 @@ stage2_offset:=0x8000
 
 all: drive.vhd
 
-drive.vhd: empty.vhd bootsect.bin stage2.bin kernel.bin
+vbox: drive.vhd
 	-VBoxManage storageattach bootsect --storagectl IDE --port 0 --device 0 --type hdd --medium none
-	-VBoxManage closemedium drive.vhd --delete
+	-VBoxManage closemedium drive_vbox.vhd --delete
+	cp drive.vhd drive_vbox.vhd
+	VBoxManage storageattach bootsect --storagectl IDE --port 0 --device 0 --type hdd --medium drive_vbox.vhd
+
+clean-vbox:
+	-VBoxManage storageattach bootsect --storagectl IDE --port 0 --device 0 --type hdd --medium none
+	-VBoxManage closemedium drive_vbox.vhd --delete
+
+drive.vhd: empty.vhd bootsect.bin stage2.bin kernel.bin
 	cp empty.vhd drive.vhd
 	dd if=bootsect.bin of=drive.vhd bs=440 count=1 conv=notrunc
 	dd if=stage2.bin of=drive.vhd seek=1 bs=512 conv=notrunc
 	powershell '$$ps = Start-Process -FilePath powershell -ArgumentList "$$(Get-Location)\kernel_to_vhd.ps1", drive.vhd, kernel.bin -Verb RunAs -PassThru; $$ps.WaitForExit(); exit $$ps.ExitCode'
-	VBoxManage storageattach bootsect --storagectl IDE --port 0 --device 0 --type hdd --medium drive.vhd
 
 empty.vhd:
 	powershell '$$ps = Start-Process -FilePath powershell -ArgumentList "$$(Get-Location)\create_vhd.ps1", empty.vhd -Verb RunAs -PassThru; $$ps.WaitForExit(); exit $$ps.ExitCode'
@@ -44,6 +51,4 @@ kernel.bin: $(C_OBJS)
 	x86_64-elf-gcc -c $< -o $@ -g -ffreestanding -O0 -Wall -Wextra
 
 clean:
-	-VBoxManage storageattach bootsect --storagectl IDE --port 0 --device 0 --type hdd --medium none
-	-VBoxManage closemedium drive.vhd --delete
 	-powershell Remove-Item -ErrorAction Ignore drive.vhd, empty.vhd, kernel.bin, $(subst $(SPACE),$(COMMA),$(S_BINS)), $(subst $(SPACE),$(COMMA),$(S_TMPS)), $(subst $(SPACE),$(COMMA),$(S_OBJS)), $(subst $(SPACE),$(COMMA),$(C_OBJS))
