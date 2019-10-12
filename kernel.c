@@ -41,7 +41,7 @@ void kmain(void) {
     term_write("22\n");
     term_write("23\n");
     term_write("24\n");
-    term_write("25_scrolled");
+    term_write("25_scrolled 1 line");
     
     while (1) {}
 }

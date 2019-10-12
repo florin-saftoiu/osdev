@@ -16,13 +16,17 @@ stage2_offset:=0x8000
 
 all: drive.vhd
 
-drive.vhd: bootsect.bin stage2.bin kernel.bin
+drive.vhd: empty.vhd bootsect.bin stage2.bin kernel.bin
 	-VBoxManage storageattach bootsect --storagectl IDE --port 0 --device 0 --type hdd --medium none
 	-VBoxManage closemedium drive.vhd --delete
-	powershell '$$ps = Start-Process -FilePath powershell -ArgumentList "$$(Get-Location)\create_vhd.ps1", drive.vhd, kernel.bin -Verb RunAs -PassThru; $$ps.WaitForExit(); exit $$ps.ExitCode'
+	cp empty.vhd drive.vhd
 	dd if=bootsect.bin of=drive.vhd bs=440 count=1 conv=notrunc
 	dd if=stage2.bin of=drive.vhd seek=1 bs=512 conv=notrunc
+	powershell '$$ps = Start-Process -FilePath powershell -ArgumentList "$$(Get-Location)\kernel_to_vhd.ps1", drive.vhd, kernel.bin -Verb RunAs -PassThru; $$ps.WaitForExit(); exit $$ps.ExitCode'
 	VBoxManage storageattach bootsect --storagectl IDE --port 0 --device 0 --type hdd --medium drive.vhd
+
+empty.vhd:
+	powershell '$$ps = Start-Process -FilePath powershell -ArgumentList "$$(Get-Location)\create_vhd.ps1", empty.vhd -Verb RunAs -PassThru; $$ps.WaitForExit(); exit $$ps.ExitCode'
 
 kernel.bin: $(C_OBJS)
 	x86_64-elf-gcc -g -Xlinker --nmagic -T kernel.ld -o $@ -ffreestanding -O0 -nostdlib -lgcc $^
@@ -42,4 +46,4 @@ kernel.bin: $(C_OBJS)
 clean:
 	-VBoxManage storageattach bootsect --storagectl IDE --port 0 --device 0 --type hdd --medium none
 	-VBoxManage closemedium drive.vhd --delete
-	-powershell Remove-Item -ErrorAction Ignore drive.vhd, drive_c.vhd, kernel.bin, $(subst $(SPACE),$(COMMA),$(S_BINS)), $(subst $(SPACE),$(COMMA),$(S_TMPS)), $(subst $(SPACE),$(COMMA),$(S_OBJS)), $(subst $(SPACE),$(COMMA),$(C_OBJS))
+	-powershell Remove-Item -ErrorAction Ignore drive.vhd, empty.vhd, kernel.bin, $(subst $(SPACE),$(COMMA),$(S_BINS)), $(subst $(SPACE),$(COMMA),$(S_TMPS)), $(subst $(SPACE),$(COMMA),$(S_OBJS)), $(subst $(SPACE),$(COMMA),$(C_OBJS))
