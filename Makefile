@@ -8,7 +8,7 @@ S_BINS:=$(S_TMPS:%.tmp=%.bin)
 bootsect_offset:=0x7c00
 stage2_offset:=0x8000
 
-.PRECIOUS: ${S_TMPS} ${S_OBJS} # keep the intermediate files for debugging
+.PRECIOUS: $(S_TMPS) $(S_OBJS) # keep the intermediate files for debugging
 
 all: drive.vhd
 
@@ -22,11 +22,11 @@ clean-vbox:
 	-VBoxManage storageattach bootsect --storagectl IDE --port 0 --device 0 --type hdd --medium none
 	-VBoxManage closemedium drive_vbox.vhd --delete
 
-drive.vhd: empty.vhd bootsect.bin stage2.bin kernel.bin
+drive.vhd: bootsect.bin stage2.bin kernel.bin empty.vhd
 	cp empty.vhd drive.vhd
+	powershell '$$ps = Start-Process -FilePath powershell -ArgumentList "$$(Get-Location)\kernel_to_vhd.ps1", drive.vhd, kernel.bin -Verb RunAs -PassThru; $$ps.WaitForExit(); exit $$ps.ExitCode'
 	dd if=bootsect.bin of=drive.vhd bs=440 count=1 conv=notrunc
 	dd if=stage2.bin of=drive.vhd seek=1 bs=512 conv=notrunc
-	powershell '$$ps = Start-Process -FilePath powershell -ArgumentList "$$(Get-Location)\kernel_to_vhd.ps1", drive.vhd, kernel.bin -Verb RunAs -PassThru; $$ps.WaitForExit(); exit $$ps.ExitCode'
 
 empty.vhd:
 	powershell '$$ps = Start-Process -FilePath powershell -ArgumentList "$$(Get-Location)\create_vhd.ps1", empty.vhd -Verb RunAs -PassThru; $$ps.WaitForExit(); exit $$ps.ExitCode'
@@ -38,7 +38,7 @@ kernel.bin: $(C_OBJS)
 	x86_64-elf-objcopy -O binary -j .text $< $@
 
 %.tmp: %.o
-	x86_64-elf-ld -T NUL -Ttext=${${basename $@}_offset} -o $@ $<
+	x86_64-elf-ld -T NUL -Ttext=$($(basename $@)_offset) -o $@ $<
 
 %.o: %.s
 	x86_64-elf-as --divide -o $@ $<
