@@ -25,7 +25,7 @@ drive.vhd: bootsect.bin stage2.bin kernel.bin
 	VBoxManage storageattach bootsect --storagectl IDE --port 0 --device 0 --type hdd --medium drive.vhd
 
 kernel.bin: $(C_OBJS)
-	x86_64-elf-gcc -Xlinker --nmagic -T kernel.ld -o $@ -ffreestanding -O2 -nostdlib -lgcc $^
+	x86_64-elf-gcc -g -Xlinker --nmagic -T kernel.ld -o $@ -ffreestanding -O0 -nostdlib -lgcc $^
 
 %.bin: %.tmp
 	x86_64-elf-objcopy -O binary -j .text $< $@
@@ -37,7 +37,7 @@ kernel.bin: $(C_OBJS)
 	x86_64-elf-as --divide -o $@ $<
 
 %.o: %.c
-	x86_64-elf-gcc -c $< -o $@ -ffreestanding -O2 -Wall -Wextra
+	x86_64-elf-gcc -c $< -o $@ -g -ffreestanding -O0 -Wall -Wextra
 
 clean:
 	-VBoxManage storageattach bootsect --storagectl IDE --port 0 --device 0 --type hdd --medium none
