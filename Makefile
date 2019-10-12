@@ -1,7 +1,3 @@
-EMPTY:=
-SPACE:=$(EMPTY) $(EMPTY)
-COMMA:=, $(EMPTY)
-
 S_SRCS:=bootsect.s stage2.s
 C_SRCS:=kernel.c string.c vga.c term.c
 S_OBJS:=$(S_SRCS:%.s=%.o)
@@ -51,4 +47,4 @@ kernel.bin: $(C_OBJS)
 	x86_64-elf-gcc -c $< -o $@ -g -ffreestanding -O0 -Wall -Wextra
 
 clean:
-	-powershell Remove-Item -ErrorAction Ignore drive.vhd, empty.vhd, kernel.bin, $(subst $(SPACE),$(COMMA),$(S_BINS)), $(subst $(SPACE),$(COMMA),$(S_TMPS)), $(subst $(SPACE),$(COMMA),$(S_OBJS)), $(subst $(SPACE),$(COMMA),$(C_OBJS))
+	rm -f drive.vhd empty.vhd kernel.bin $(S_BINS) $(S_TMPS) $(S_OBJS) $(C_OBJS)
