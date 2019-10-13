@@ -14,8 +14,11 @@ TODO
 1. higher half
 2. paging
 3. disk driver
-4. use int 13h extended read
-5. beyond ...
+4. keyboard input
+5. use int 13h extended read in real mode
+6. use GUID Partition Table
+7. PE format ??
+8. beyond ...
 
 
 x86_64 address space
