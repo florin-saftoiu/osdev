@@ -8,7 +8,7 @@
 const size_t VGA_WIDTH = 80;
 const size_t VGA_HEIGHT = 25;
 
-uint16_t* vga_buffer = (uint16_t*) 0xb8000;
+uint16_t* vga_buffer = (uint16_t*) 0xffff8000000b8000;
 
 static inline uint8_t vga_entry_color(enum vga_color fg, enum vga_color bg) {
 	return fg | bg << 4;
