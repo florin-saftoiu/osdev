@@ -44,7 +44,7 @@ kernel.bin: $(C_OBJS)
 	x86_64-elf-as --divide -o $@ $<
 
 %.o: %.c
-	x86_64-elf-gcc -c $< -o $@ -g -ffreestanding -O0 -Wall -Wextra
+	x86_64-elf-gcc -c $< -o $@ -g -ffreestanding -O0 -Wall -Wextra -mcmodel=large
 
 clean:
 	rm -f drive.vhd empty.vhd kernel.bin $(S_BINS) $(S_TMPS) $(S_OBJS) $(C_OBJS)

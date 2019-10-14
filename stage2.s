@@ -341,7 +341,9 @@ _start32:
 
     mov     %cr3, %edi                      # restore %edi from %cr3, since it was modified by stosl
     movl    $(pdpt_start + 3), (%edi)       # pml4t[0] -> pdpt[0] + set bits for page is present and writable
-    add     $0x1000, %edi
+    add     $2048, %edi
+    movl    $(pdpt_start + 3), (%edi)       # pml4t[256] -> pdpt[0] + set bits for page is present and writable
+    add     $2048, %edi
     movl    $(pdt_start + 3), (%edi)        # pdpt[0] -> pdt[0] + set bits for page is present and writable
     add     $0x1000, %edi
     movl    $(pt_start + 3), (%edi)         # pdt[0] -> pt[0] + set bits for page is present and writable
@@ -352,7 +354,7 @@ _start32:
     mov     %ebx, (%edi)                    # pt[i] -> 0x0 + (0x1000 * i) + set bits for page is present and writable
     add     $0x1000, %ebx
     add     $8, %edi
-    loop    1b                              # this identity maps the first 2 Mb of virtual space to the first 2Mb of physical space
+    loop    1b                              # this maps the first 2 Mb in the higher half of virtual space to the first 2Mb of physical space
 
     mov     %cr4, %eax
     or      $(1 << 5), %eax
@@ -372,17 +374,27 @@ _start32:
 
 .code64
 _start64:
-    mov     $idt64_start, %rdi
+    mov     $0xffff800000000000, %rax
+    movabs  $gdt64_desc_high, %rbx
+    add     %rbx, %rax
+    lgdt    (%rax)
+
+    mov     $(0xffff800000000000 + idt64_start), %rdi
     mov     $4096, %rcx
     rep     stosb                           # setup empty IDT starting at 0x6400, right up to 0x7400
-    lidt    idt64_desc
+    mov     $0xffff800000000000, %rax
+    movabs  $idt64_desc_high, %rbx
+    add     %rbx, %rax
+    lidt    (%rax)
 
-    mov     $(stage2_start - 4), %rsp       # stack will grow down from stage2_start, same as in real and protected mode
+    mov     $(0xffff800000000000 + stage2_start - 4), %rsp       # stack will grow down from stage2_start, same as in real and protected mode
 
     # move kernel 0x100000 = 1Mb
-    mov     $kernel_start, %rbx
-    add     (kernel_start + 32), %rbx       # program header offset
-    movzwq  (kernel_start + 56), %rcx       # number of entries in program header
+    mov     $(0xffff800000000000 + kernel_start), %rbx
+    mov     $(0xffff800000000000 + kernel_start + 32), %rax
+    add     (%rax), %rbx       # program header offset
+    mov     $(0xffff800000000000 + kernel_start + 56), %rax
+    movzwq  (%rax), %rcx       # number of entries in program header
 1:
     mov     (%rbx), %eax                    # move p_type into %eax
     cmp     $1, %eax                        # if p_type = 1 then it's a LOAD segment
@@ -393,7 +405,7 @@ _start64:
     mov     40(%rbx), %rcx                  # p_memsz in %rcx
     rep     stosb                           # clear p_memsz bytes at p_vaddr
 
-    mov     $kernel_start, %rsi
+    mov     $(0xffff800000000000 + kernel_start), %rsi
     xor     %rax, %rax
     mov     8(%rbx), %eax
     add     %rax, %rsi                      # kernel_offset + p_offset in %rsi
@@ -406,7 +418,7 @@ _start64:
     add     $56, %rbx                       # move to next segment
     loop    1b
     
-    mov     (kernel_start + 24), %rax       # program entry address
+    mov     (0xffff800000000000 + kernel_start + 24), %rax       # program entry address
     jmp     *%rax
 
 .code16
@@ -566,6 +578,9 @@ gdt64_end:
 gdt64_desc:
     .word gdt64_end - gdt64_start - 1       # limit is (gdt_end - gdt_start - 1), size is (gdt_end - gdt_start), LGDT expects the limit, not the size
     .quad gdt64_start
+gdt64_desc_high:
+    .word gdt64_end - gdt64_start - 1       # limit is (gdt_end - gdt_start - 1), size is (gdt_end - gdt_start), LGDT expects the limit, not the size
+    .quad (0xffff800000000000 + gdt64_start)
 
 # interrupt descriptor table descriptor
 idt_desc:
@@ -576,3 +591,6 @@ idt_desc:
 idt64_desc:
     .word 4095                              # limit is 4095, size is 4096
     .quad idt64_start
+idt64_desc_high:
+    .word 4095                              # limit is 4095, size is 4096
+    .quad (0xffff800000000000 + idt64_start)

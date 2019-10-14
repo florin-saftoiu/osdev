@@ -10,5 +10,5 @@ target remote :1234
 display/i $pc
 #break *0x7c00
 #break *0x8000
-break *0x100000
+break *0xffff800000100000
 continue
