@@ -11,14 +11,13 @@ Requirements
 
 TODO
 ====
-1. clean higher half
-2. paging
-3. disk driver
-4. keyboard input
-5. use int 13h extended read in real mode
-6. use GUID Partition Table
-7. PE format ??
-8. beyond ...
+1. paging
+2. disk driver
+3. keyboard input
+4. use int 13h extended read in real mode
+5. use GUID Partition Table
+6. PE format ??
+7. beyond ...
 
 
 x86_64 address space

@@ -14,6 +14,7 @@
 .set fat_region_start, 0x8800
 .set root_directory_start, 0x8a00
 .set kernel_start, 0x8a00
+.set hh, 0xffff800000000000
 _start:
     push    %cx                             # 4(%bp) = drive number passed by bootsect in %cx
     push    %dx                             # 2(%bp) = high byte of starting sector of active partition passed by bootsect in %dx:%ax
@@ -374,27 +375,30 @@ _start32:
 
 .code64
 _start64:
-    mov     $0xffff800000000000, %rax
+    mov     $hh, %rax
     movabs  $gdt64_desc_high, %rbx
     add     %rbx, %rax
     lgdt    (%rax)
 
-    mov     $(0xffff800000000000 + idt64_start), %rdi
+    mov     $(hh + idt64_start), %rdi
     mov     $4096, %rcx
     rep     stosb                           # setup empty IDT starting at 0x6400, right up to 0x7400
-    mov     $0xffff800000000000, %rax
+    mov     $hh, %rax
     movabs  $idt64_desc_high, %rbx
     add     %rbx, %rax
     lidt    (%rax)
 
-    mov     $(0xffff800000000000 + stage2_start - 4), %rsp       # stack will grow down from stage2_start, same as in real and protected mode
+    mov     $(hh + stage2_start - 4), %rsp  # stack will grow down from stage2_start, same as in real and protected mode
 
-    # move kernel 0x100000 = 1Mb
-    mov     $(0xffff800000000000 + kernel_start), %rbx
-    mov     $(0xffff800000000000 + kernel_start + 32), %rax
-    add     (%rax), %rbx       # program header offset
-    mov     $(0xffff800000000000 + kernel_start + 56), %rax
-    movzwq  (%rax), %rcx       # number of entries in program header
+    mov     $(hh + pml4t_start), %rax
+    movq    $0, (%rax)
+    invlpg  0                               # invalidate identity mapping of the first 2 Mb
+
+    mov     $(hh + kernel_start), %rbx
+    mov     $(hh + kernel_start + 32), %rax
+    add     (%rax), %rbx                    # program header offset
+    mov     $(hh + kernel_start + 56), %rax
+    movzwq  (%rax), %rcx                    # number of entries in program header
 1:
     mov     (%rbx), %eax                    # move p_type into %eax
     cmp     $1, %eax                        # if p_type = 1 then it's a LOAD segment
@@ -405,7 +409,7 @@ _start64:
     mov     40(%rbx), %rcx                  # p_memsz in %rcx
     rep     stosb                           # clear p_memsz bytes at p_vaddr
 
-    mov     $(0xffff800000000000 + kernel_start), %rsi
+    mov     $(hh + kernel_start), %rsi
     xor     %rax, %rax
     mov     8(%rbx), %eax
     add     %rax, %rsi                      # kernel_offset + p_offset in %rsi
@@ -418,7 +422,7 @@ _start64:
     add     $56, %rbx                       # move to next segment
     loop    1b
     
-    mov     (0xffff800000000000 + kernel_start + 24), %rax       # program entry address
+    mov     (hh + kernel_start + 24), %rax  # program entry address
     jmp     *%rax
 
 .code16
@@ -580,7 +584,7 @@ gdt64_desc:
     .quad gdt64_start
 gdt64_desc_high:
     .word gdt64_end - gdt64_start - 1       # limit is (gdt_end - gdt_start - 1), size is (gdt_end - gdt_start), LGDT expects the limit, not the size
-    .quad (0xffff800000000000 + gdt64_start)
+    .quad (hh + gdt64_start)
 
 # interrupt descriptor table descriptor
 idt_desc:
@@ -593,4 +597,4 @@ idt64_desc:
     .quad idt64_start
 idt64_desc_high:
     .word 4095                              # limit is 4095, size is 4096
-    .quad (0xffff800000000000 + idt64_start)
+    .quad (hh + idt64_start)
