@@ -317,6 +317,7 @@ _pm:
 
     lgdt    gdt_desc
 
+    xor     %ax, %ax
     mov     $idt_start, %di
     mov     $2048, %cx
     rep     stosb                           # setup empty IDT starting at 0x7400, right up to 0x7c00
@@ -380,6 +381,7 @@ _start64:
     add     %rbx, %rax
     lgdt    (%rax)
 
+    xor     %rax, %rax
     mov     $(hh + idt64_start), %rdi
     mov     $4096, %rcx
     rep     stosb                           # setup empty IDT starting at 0x6400, right up to 0x7400
