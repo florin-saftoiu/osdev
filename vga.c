@@ -28,6 +28,16 @@ void vga_putch(unsigned char uc, enum vga_color fg, enum vga_color bg, size_t x,
     vga_buffer[y * VGA_WIDTH + x] = vga_entry(uc, vga_entry_color(fg, bg));
 }
 
+void vga_putstr(char* str, enum vga_color fg, enum vga_color bg, size_t x, size_t y) {
+    size_t len = strlen(str);
+    if (len > VGA_WIDTH * VGA_HEIGHT - (y * VGA_WIDTH + x)) {
+        len = VGA_WIDTH * VGA_HEIGHT - (y * VGA_WIDTH + x);
+    }
+    for (size_t i = 0; i < len; i++) {
+        vga_buffer[y * VGA_WIDTH + x + i] = vga_entry(str[i], vga_entry_color(fg, bg));
+    }
+}
+
 void vga_scroll(void) {
     memmove(vga_buffer, vga_buffer + VGA_WIDTH, VGA_WIDTH * VGA_HEIGHT * 2);
     memset(vga_buffer + (VGA_WIDTH * (VGA_HEIGHT - 1)), 0, VGA_WIDTH * 2);

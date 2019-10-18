@@ -28,6 +28,7 @@ const size_t VGA_HEIGHT;
 
 void vga_clrscr(void);
 void vga_putch(unsigned char uc, enum vga_color fg, enum vga_color bg, size_t x, size_t y);
+void vga_putstr(char* str, enum vga_color fg, enum vga_color bg, size_t x, size_t y);
 void vga_scroll(void);
 
 #endif /* VGA_H */
