@@ -51,3 +51,16 @@ void term_write(const char* str) {
         term_putch(str[i]);
     }
 }
+
+void term_write_number(int i) {
+    if (i < 0) {
+        term_putch('-');
+        i = -i;
+    }
+
+    if (i / 10) {
+        term_write_number(i / 10);
+    }
+
+    term_putch(i % 10 + '0');
+}
