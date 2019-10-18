@@ -29,6 +29,6 @@ void vga_putch(unsigned char uc, enum vga_color fg, enum vga_color bg, size_t x,
 }
 
 void vga_scroll(void) {
-    memmove(vga_buffer, vga_buffer + VGA_WIDTH, VGA_WIDTH * VGA_HEIGHT);
-    memset(vga_buffer + (VGA_WIDTH * (VGA_HEIGHT - 1)), 0, VGA_WIDTH);
+    memmove(vga_buffer, vga_buffer + VGA_WIDTH, VGA_WIDTH * VGA_HEIGHT * 2);
+    memset(vga_buffer + (VGA_WIDTH * (VGA_HEIGHT - 1)), 0, VGA_WIDTH * 2);
 }
