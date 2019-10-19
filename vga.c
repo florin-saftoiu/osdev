@@ -6,7 +6,7 @@
 #include <stddef.h>
 
 const size_t VGA_WIDTH = 80;
-const size_t VGA_HEIGHT = 25;
+const size_t VGA_HEIGHT = 24;
 
 uint16_t* vga_buffer = (uint16_t*) 0xffff8000000b8000;
 
@@ -39,6 +39,6 @@ void vga_putstr(char* str, enum vga_color fg, enum vga_color bg, size_t x, size_
 }
 
 void vga_scroll(void) {
-    memmove(vga_buffer, vga_buffer + VGA_WIDTH, VGA_WIDTH * VGA_HEIGHT * 2);
+    memmove(vga_buffer, vga_buffer + VGA_WIDTH, VGA_WIDTH * (VGA_HEIGHT - 1) * 2);
     memset(vga_buffer + (VGA_WIDTH * (VGA_HEIGHT - 1)), 0, VGA_WIDTH * 2);
 }
