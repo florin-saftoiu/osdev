@@ -64,7 +64,7 @@ __attribute__ ((interrupt)) void gpf_handler(interrupt_frame* frame, uint64_t er
 }
 
 __attribute__ ((interrupt)) void interrupt_handler(interrupt_frame* frame) {
-    term_write("IDT\n");
+    term_write("INT\n");
 }
 
 __attribute__ ((interrupt)) void timer_handler(interrupt_frame* frame) {
@@ -73,7 +73,7 @@ __attribute__ ((interrupt)) void timer_handler(interrupt_frame* frame) {
     uint8_t low = inb(0x40);
     uint8_t high = inb(0x40);
     uint16_t count = (high << 8) + low;
-    char* count_str = "     ";
+    char count_str[5];
     int i = 4;
     while (count / 10) {
         count_str[i] = (count % 10) + '0';
@@ -81,7 +81,7 @@ __attribute__ ((interrupt)) void timer_handler(interrupt_frame* frame) {
         i--;
     }
     count_str[i] = (count % 10) + '0';
-    vga_putstr("Timer ", VGA_COLOR_WHITE, VGA_COLOR_RED, 69, 24);
+    vga_putstr("T=", VGA_COLOR_WHITE, VGA_COLOR_RED, 73, 24);
     vga_putstr(count_str, VGA_COLOR_WHITE, VGA_COLOR_RED, 75, 24);
     irq_restore(rflags);
     outb(0x20, 0x20);
@@ -151,6 +151,15 @@ void kmain(void) {
     idt[32].offset_31_16 = (timer_handler_address & 0xffff0000) >> 16;
     idt[32].offset_63_32 = (timer_handler_address & 0xffffffff00000000) >> 32;
     idt[32].zero = 0;
+
+    uint64_t keyboard_handler_address = (uint64_t) keyboard_handler;
+    idt[33].offset_15_0 = keyboard_handler_address & 0xffff;
+    idt[33].selector = 0x8;
+    idt[33].ist = 0;
+    idt[33].type_attr = 0x8e;
+    idt[33].offset_31_16 = (keyboard_handler_address & 0xffff0000) >> 16;
+    idt[33].offset_63_32 = (keyboard_handler_address & 0xffffffff00000000) >> 32;
+    idt[33].zero = 0;
 
     irq_enable();
 
