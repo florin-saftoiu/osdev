@@ -73,7 +73,7 @@ __attribute__ ((interrupt)) void timer_handler(interrupt_frame* frame) {
     uint8_t low = inb(0x40);
     uint8_t high = inb(0x40);
     uint16_t count = (high << 8) + low;
-    char count_str[5];
+    char count_str[] = "     ";
     int i = 4;
     while (count / 10) {
         count_str[i] = (count % 10) + '0';
@@ -88,7 +88,17 @@ __attribute__ ((interrupt)) void timer_handler(interrupt_frame* frame) {
 }
 
 __attribute__ ((interrupt)) void keyboard_handler(interrupt_frame* frame) {
-    term_write("KEY\n");
+    uint8_t code = inb(0x60);
+    char code_str[] = "00";
+    int i = 1;
+    while (code / 16) {
+        code_str[1] = (code % 16) + (code % 16 > 9 ? '7' : '0');
+        code = code / 16;
+        i--;
+    }
+    code_str[i] = (code % 16) + (code % 16 > 9 ? '7' : '0');
+    vga_putstr("K=0x", VGA_COLOR_WHITE, VGA_COLOR_BLUE, 0, 24);
+    vga_putstr(code_str, VGA_COLOR_WHITE, VGA_COLOR_BLUE, 4, 24);
     outb(0x20, 0x20);
 }
 #pragma GCC diagnostic pop

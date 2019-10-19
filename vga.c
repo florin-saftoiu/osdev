@@ -30,9 +30,6 @@ void vga_putch(unsigned char uc, enum vga_color fg, enum vga_color bg, size_t x,
 
 void vga_putstr(char* str, enum vga_color fg, enum vga_color bg, size_t x, size_t y) {
     size_t len = strlen(str);
-    if (len > VGA_WIDTH * VGA_HEIGHT - (y * VGA_WIDTH + x)) {
-        len = VGA_WIDTH * VGA_HEIGHT - (y * VGA_WIDTH + x);
-    }
     for (size_t i = 0; i < len; i++) {
         vga_buffer[y * VGA_WIDTH + x + i] = vga_entry(str[i], vga_entry_color(fg, bg));
     }

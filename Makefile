@@ -32,7 +32,7 @@ empty.vhd:
 	powershell '$$ps = Start-Process -FilePath powershell -ArgumentList "$$(Get-Location)\create_vhd.ps1", empty.vhd -Verb RunAs -PassThru; $$ps.WaitForExit(); exit $$ps.ExitCode'
 
 kernel.bin: $(C_OBJS)
-	x86_64-elf-gcc -g -Xlinker --nmagic -T kernel.ld -o $@ -ffreestanding -O0 -nostdlib -lgcc $^
+	x86_64-elf-gcc -g -Xlinker --nmagic -T kernel.ld -o $@ -ffreestanding -O0 -nostdlib -mno-red-zone -lgcc $^
 
 %.bin: %.tmp
 	x86_64-elf-objcopy -O binary -j .text $< $@
