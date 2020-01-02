@@ -1,7 +1,6 @@
 #ifndef VGA_H
 #define VGA_H
 
-#include <stdint.h>
 #include <stddef.h>
 
 enum vga_color {
@@ -23,8 +22,8 @@ enum vga_color {
     VGA_COLOR_WHITE = 15
 };
 
-const size_t VGA_WIDTH;
-const size_t VGA_HEIGHT;
+extern const size_t VGA_WIDTH;
+extern const size_t VGA_HEIGHT;
 
 void vga_clrscr(void);
 void vga_putch(unsigned char uc, enum vga_color fg, enum vga_color bg, size_t x, size_t y);
