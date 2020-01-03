@@ -1,5 +1,5 @@
 .vscode
-bootsect
+vbox
 
 *.o
 *.exe
