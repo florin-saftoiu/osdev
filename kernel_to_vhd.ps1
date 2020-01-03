@@ -5,15 +5,21 @@ param(
 $ErrorActionPreference = "Stop"
 $img = Mount-DiskImage -ImagePath "$PSScriptRoot\$filename" -PassThru -NoDriveLetter
 New-Item -ItemType Directory -Path "$PSScriptRoot\mnt_$filename"
-Add-PartitionAccessPath -DiskNumber $img.Number -PartitionNumber 1 -AccessPath "$PSScriptRoot\mnt_$filename"
+$partition = Add-PartitionAccessPath -DiskNumber $img.Number -PartitionNumber 1 -AccessPath "$PSScriptRoot\mnt_$filename" -PassThru
 $kernelSize = (Get-Item -Path "$PSScriptRoot\$kernel").length
 Write-Output "Kernel size = $kernelSize"
 $kernelClusters = [int] ($kernelSize / 4096)
 if ($kernelSize % 4096 -ne 0) {
     $kernelClusters += 1
 }
+$volumeSize = (Get-Volume -Partition $partition).Size
+$volumeRemainingSize = (Get-Volume -Partition $partition).SizeRemaining
+Write-Output "Volume size = $volumeSize"
+Write-Output "Volume remaining size = $volumeRemainingSize"
+$volumeRemainingClusters = [int] ($volumeRemainingSize / 4096)
+Write-Output "Volume remaining clusters = $volumeRemainingClusters"
 Write-Output "Kernel clusters = $kernelClusters"
-$totalClusters = 2256 - 2 - 1 - 2 # 2 for the root directory, 1 for the allocation bitmap, 2 for the up-case table
+$totalClusters = $volumeRemainingClusters - 1 # root directory will grow by 1 cluster, so we substract it
 $filesClusters = $totalClusters - $kernelClusters
 $leftoverClusters = $filesClusters % 42
 $fileClusters = ($filesClusters - $leftoverClusters) / 42
