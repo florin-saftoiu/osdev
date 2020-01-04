@@ -1,7 +1,7 @@
-S_SRCS:=bootsect.s stage2.s
-C_SRCS:=kernel.c string.c vga.c term.c
-S_OBJS:=$(S_SRCS:%.s=build/%.o)
-C_OBJS:=$(C_SRCS:%.c=build/%.o)
+S_SRCS:=src/bootsect.s src/stage2.s
+C_SRCS:=src/kernel.c src/string.c src/vga.c src/term.c
+S_OBJS:=$(S_SRCS:src/%.s=build/%.o)
+C_OBJS:=$(C_SRCS:src/%.c=build/%.o)
 S_TMPS:=$(S_OBJS:%.o=%.tmp)
 S_BINS:=$(S_TMPS:%.tmp=%.bin)
 
@@ -40,11 +40,11 @@ build/%.bin: build/%.tmp
 build/%.tmp: build/%.o
 	x86_64-elf-ld -T NUL -Ttext=$($(basename $@)_offset) -o $@ $<
 
-build/%.o: %.s
+build/%.o: src/%.s
 	x86_64-elf-as --divide -o $@ $<
 
-build/%.o: %.c
-	x86_64-elf-gcc -c $< -o $@ -g -ffreestanding -O0 -Wall -Wextra -mcmodel=large -mno-red-zone -mgeneral-regs-only
+build/%.o: src/%.c
+	x86_64-elf-gcc -c $< -o $@ -Iinclude -g -ffreestanding -O0 -Wall -Wextra -mcmodel=large -mno-red-zone -mgeneral-regs-only
 
 clean:
 	rm -f build/drive.vhd build/empty.vhd build/kernel.bin $(S_BINS) $(S_TMPS) $(S_OBJS) $(C_OBJS)

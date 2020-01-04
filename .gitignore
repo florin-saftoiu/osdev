@@ -1,9 +1,7 @@
 .vscode
-vbox
 
-*.o
-*.exe
-*.tmp
-*.bin
-*.img
-*.vhd
+vbox/*
+!vbox/.gitkeep
+
+build/*
+!build/.gitkeep
