@@ -7,20 +7,17 @@
 
 size_t term_x;
 size_t term_y;
-enum vga_color term_fg;
-enum vga_color term_bg;
+vga_color term_color;
 
 void term_init(void) {
     term_x = 0;
     term_y = 0;
-    term_fg = VGA_COLOR_WHITE;
-    term_bg = VGA_COLOR_BLACK;
+    term_color = FG_WHITE | BG_BLACK;
     vga_clrscr();
 }
 
-void term_setcolors(enum vga_color fg, enum vga_color bg) {
-    term_fg = fg;
-    term_bg = bg;
+void term_setcolor(vga_color color) {
+    term_color = color;
 }
 
 static void term_putch(unsigned char uc) {
@@ -32,7 +29,7 @@ static void term_putch(unsigned char uc) {
             term_y++;
         }
     } else {
-        vga_putch(uc, term_fg, term_bg, term_x, term_y);
+        vga_putch(uc, term_color, term_x, term_y);
         term_x++;
         if (term_x == VGA_WIDTH) {
             term_x = 0;

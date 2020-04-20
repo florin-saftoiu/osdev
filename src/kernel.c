@@ -81,8 +81,8 @@ __attribute__ ((interrupt)) void timer_handler(interrupt_frame* frame) {
         i--;
     }
     count_str[i] = (count % 10) + '0';
-    vga_putstr("T=", VGA_COLOR_WHITE, VGA_COLOR_RED, 73, 24);
-    vga_putstr(count_str, VGA_COLOR_WHITE, VGA_COLOR_RED, 75, 24);
+    vga_putstr("T=", FG_WHITE | BG_RED, 73, 24);
+    vga_putstr(count_str, FG_WHITE | BG_RED, 75, 24);
     irq_restore(rflags);
     outb(0x20, 0x20);
 }
@@ -97,8 +97,8 @@ __attribute__ ((interrupt)) void keyboard_handler(interrupt_frame* frame) {
         i--;
     }
     code_str[i] = (code % 16) + (code % 16 > 9 ? '7' : '0');
-    vga_putstr("K=0x", VGA_COLOR_WHITE, VGA_COLOR_BLUE, 0, 24);
-    vga_putstr(code_str, VGA_COLOR_WHITE, VGA_COLOR_BLUE, 4, 24);
+    vga_putstr("K=0x", FG_WHITE | BG_BLUE, 0, 24);
+    vga_putstr(code_str, FG_WHITE | BG_BLUE, 4, 24);
     outb(0x20, 0x20);
 }
 #pragma GCC diagnostic pop
@@ -107,7 +107,7 @@ void kmain(void) {
     stuff++;
     other = 76;
     term_init();
-    term_setcolors(VGA_COLOR_WHITE, VGA_COLOR_GREEN);
+    term_setcolor(FG_WHITE | BG_GREEN);
     term_write("OKAY");
     term_write((char*) &stuff);
     term_write((char*) &other);
