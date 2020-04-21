@@ -36,13 +36,3 @@ Requirements
 * [dd for windows](http://www.chrysocome.net/dd)
 * qemu
 * _virtual box, optional_
-
-TODO
-----
-1. paging
-2. disk driver
-3. keyboard input
-4. use int 13h extended read in real mode
-5. use GUID Partition Table
-6. PE format ??
-7. beyond ...
