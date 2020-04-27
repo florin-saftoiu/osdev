@@ -12,18 +12,16 @@ build/stage2_offset:=0x8000
 
 all: build/drive.vhd
 
-vbox: build/drive.vhd
-	-VBoxManage storageattach bootsect --storagectl IDE --port 0 --device 0 --type hdd --medium none
-	-VBoxManage closemedium vbox\drive_vbox.vhd --delete
-	cp build\drive.vhd vbox\drive_vbox.vhd
-	VBoxManage storageattach bootsect --storagectl IDE --port 0 --device 0 --type hdd --medium vbox\drive_vbox.vhd
+vbox: vbox/bootsect/bootsect.vbox
 
-clean-vbox:
-	-VBoxManage storageattach bootsect --storagectl IDE --port 0 --device 0 --type hdd --medium none
-	-VBoxManage closemedium vbox\drive_vbox.vhd --delete
+vbox/bootsect/bootsect.vbox: build/drive.vhd
+	-VBoxManage unregistervm bootsect --delete
+	cp build/drive.vhd vbox/drive_vbox.vhd
+	VBoxManage createvm --name bootsect --basefolder $(CURDIR)/vbox --ostype VBoxBS_64 --default --register
+	VBoxManage storageattach bootsect --storagectl IDE --port 0 --device 0 --type hdd --medium vbox/drive_vbox.vhd	
 
 build/drive.vhd: build/bootsect.bin build/stage2.bin build/kernel.bin build/empty.vhd
-	cp build\empty.vhd build\drive.vhd
+	cp build/empty.vhd build/drive.vhd
 	powershell '$$ps = Start-Process -FilePath powershell -ArgumentList "$$(Get-Location)\kernel_to_vhd.ps1", build\drive.vhd, build\kernel.bin -Verb RunAs -PassThru; $$ps.WaitForExit(); exit $$ps.ExitCode'
 	dd if=build/bootsect.bin of=build/drive.vhd bs=440 count=1 conv=notrunc
 	dd if=build/stage2.bin of=build/drive.vhd seek=1 bs=512 conv=notrunc
@@ -47,4 +45,5 @@ build/%.o: src/%.c
 	x86_64-elf-gcc -c $< -o $@ -Iinclude -g -ffreestanding -O0 -Wall -Wextra -mcmodel=large -mno-red-zone -mgeneral-regs-only
 
 clean:
-	rm -f build/drive.vhd build/empty.vhd build/kernel.bin $(S_BINS) $(S_TMPS) $(S_OBJS) $(C_OBJS)
+	-VBoxManage unregistervm bootsect --delete
+	rm -f vbox/drive_vbox.vhd build/drive.vhd build/empty.vhd build/kernel.bin $(S_BINS) $(S_TMPS) $(S_OBJS) $(C_OBJS)
