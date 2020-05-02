@@ -68,15 +68,11 @@ _print:
     ret
 
 # read sectors from a disk starting at a given sector (in LBA format) into a buffer
-# input
-# read %ch sectors from disk %cl starting at sector %dx:%ax (in LBA format)
-# into buffer starting at %es:%bx
-# input:  %ch - number of sectors to read
-#         %cl - drive number
-#         %dx:%ax - logical sector number of the start sector
-#         %es:%bx - buffer address
-# output: data from logical sector in %ds:%ax at memory location %es:%bx
-#         CF - set on error
+# input: drive - drive number
+#        start - logical sector number of the start sector
+#        nb - number of sectors to read
+#        buffer - buffer address
+# output: data from logical sector in start at memory location in buffer
 # void _readsec(uint16_t drive, uint32_t start, uint16_t nb, void* buffer)
 _readsec:
     push    %bp
