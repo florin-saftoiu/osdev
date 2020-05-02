@@ -1,7 +1,7 @@
-.code16
+    .code16
 
-.set secs_per_track, 63
-.set num_heads, 16
+    .set secs_per_track, 63
+    .set num_heads, 16
 
 _0:
     ljmp     $0x0, $_start          # bios may load boot sector at 0x0:0x7c00 or at 0x7c0:0x0
@@ -13,9 +13,15 @@ _start:
     mov     %ax, %ds
     mov     %ax, %es
     mov     %ax, %ss                # https://wiki.osdev.org/Memory_Map_(x86)
-    mov     $0x7bfe, %sp            # stack grows down from the boot sector
+    mov     $0x7c00, %sp            # stack grows down from the boot sector
 
     sti                             # interrupts can work again from here
+
+    mov     %sp, %bp                # use %bp to point at the current stack top
+    sub     $2, %sp                 # make room for 1 local variable
+
+    xor     %dh, %dh                # make sure high byte of %dx is 0, because we can't just push %dl
+    mov     %dx, -2(%bp)            # save drive number left by bios in %dl in 1st local variable
 
     push    $msg                    # push param for call to print
     call    _print
@@ -25,14 +31,13 @@ _start:
     push    $1                      # push number of sectors to read for call to readsec
     push    $1                      # push low byte of start sector for call to readsec
     push    $0                      # push high byte of start sector for call to readsec
-    xor     %dh, %dh
-    push    %dx                     # push drive number left by bios in %dl for call to readsec
+    push    -2(%bp)                 # push drive number from 1st local variable for call to readsec
     call    _readsec
-    add     $10, %sp                # cleanup stack after call to print
+    add     $10, %sp                # cleanup stack after return from readsec
 
-    push    $0x7e00
+    push    $0x7e00                 # push param for call to print
     call    _print
-    add     $2, %sp
+    add     $2, %sp                 # cleanup stack after return from print
 
 _hang:
     jmp     _hang
@@ -43,7 +48,7 @@ _hang:
 # void _print(char* str)
 _print:
     push    %bp                     # save caller's %bp
-    mov     %sp, %bp                # use bp to point at the current stack top
+    mov     %sp, %bp                # use %bp to point at the current stack top
 
     push    %bx                     # save %bx
     push    %si                     # save %si
@@ -75,8 +80,8 @@ _print:
 # output: data from logical sector in start at memory location in buffer
 # void _readsec(uint16_t drive, uint32_t start, uint16_t nb, void* buffer)
 _readsec:
-    push    %bp
-    mov     %sp, %bp
+    push    %bp                     # save caller's %bp
+    mov     %sp, %bp                # use %bp to point at the current stack top
 
     push    %bx                     # save %bx
     push    %di                     # save %di
@@ -126,10 +131,10 @@ msg:
     .asciz "Hello, world !"
 
 # fill up the sector
-.fill 510 - (. - _0), 1, 0
+    .fill 510 - (. - _0), 1, 0
 
 # boot identifier
-.word 0xaa55
+    .word 0xaa55
 
 # more sectors
 sector2:
