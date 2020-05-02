@@ -5,3 +5,5 @@ vbox/*
 
 build/*
 !build/.gitkeep
+
+*.pid
