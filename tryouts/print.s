@@ -1,4 +1,4 @@
-.code16
+    .code16
 
 _0:
     ljmp     $0x0, $_start          # bios may load boot sector at 0x0:0x7c00 or at 0x7c0:0x0
@@ -10,7 +10,7 @@ _start:
     mov     %ax, %ds
     mov     %ax, %es
     mov     %ax, %ss                # https://wiki.osdev.org/Memory_Map_(x86)
-    mov     $0x7bfe, %sp            # stack grows down from the boot sector
+    mov     $0x7c00, %sp            # stack grows down from the boot sector
 
     sti                             # interrupts can work again from here
 
@@ -27,7 +27,7 @@ _hang:
 # void _print(char* str)
 _print:
     push    %bp                     # save caller's %bp
-    mov     %sp, %bp                # use bp to point at the current stack top
+    mov     %sp, %bp                # use %bp to point at the current stack top
 
     push    %bx                     # save %bx
     push    %si                     # save %si
@@ -56,7 +56,7 @@ msg:
     .asciz "Hello, world !"
 
 # fill up the sector
-.fill 510 - (. - _0), 1, 0
+    .fill 510 - (. - _0), 1, 0
 
 # boot identifier
-.word 0xaa55
+    .word 0xaa55
