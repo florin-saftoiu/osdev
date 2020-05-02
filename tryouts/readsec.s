@@ -96,7 +96,7 @@ _readsec:
     mov     %dl, %dh                # %dh = head = (LBA sector / sec_per_track) % num_heads
     
     movb    4(%bp), %dl             # load drive number into %dl from parameter
-    movb    10(%bp), %al             # load number of sectors to read into %al from paramter
+    movb    10(%bp), %al            # load number of sectors to read into %al from paramter
 
     mov     12(%bp), %bx            # load address of buffer into %bx from parameter
 
