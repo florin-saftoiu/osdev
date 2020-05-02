@@ -35,4 +35,62 @@ Requirements
 * **x86_64 ELF GCC cross-compiler** that you have to build for yourself (see https://wiki.osdev.org/GCC_Cross-Compiler)
 * [dd for windows](http://www.chrysocome.net/dd)
 * qemu
-* _virtual box, optional_
+* _VirtualBox, optional_
+* _VSCode & C/C++ extension & Native Debug extension, optional_
+
+Running with QEMU
+----------------
+* ```make```
+* ```qemu-system-x86_64.exe -drive file=build/drive.vhd,format=vpc```
+
+Running with VirtualBox
+----------------------
+* ```make vbox```
+* ```VBoxManage startvm bootsect```
+
+Debugging with GDB & QEMU
+------------------------
+* ```make```
+* ```gdb -x bootsect.gdb```
+
+Debugging with VSCode & QEMU
+---------------------------
+The following tasks need to be in your ```tasks.json``` file : 
+
+    {
+      "label": "qemu kernel.c",
+      "type": "shell",
+      "command": "qemu-system-x86_64w.exe",
+      "args": [
+          "-pidfile",
+          "qemu_kernel_c.pid",
+          "-s",
+          "-S",
+          "-drive",
+          "file=build/drive.vhd,format=vpc"
+      ],
+      "dependsOn": "build kernel.c"
+    },
+    {
+        "label": "kill qemu kernel.c",
+        "type": "shell",
+        "command": "powershell",
+        "args": [
+            "Stop-Process -Id $(Get-Content qemu_kernel_c.pid)"
+        ]
+    }
+
+The following configuration needs to be in your ```launch.json``` file :
+
+    {
+        "type": "gdb",
+        "request": "attach",
+        "name": "gdb kernel.c",
+        "executable": "./build/kernel.bin",
+        "target": ":1234",
+        "remote": true,
+        "cwd": "${workspaceRoot}",
+        "valuesFormatting": "parseText",
+        "preLaunchTask": "qemu kernel.c",
+        "postDebugTask": "kill qemu kernel.c"
+    }
