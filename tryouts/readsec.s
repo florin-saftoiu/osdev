@@ -29,15 +29,26 @@ _start:
 
     push    $0x7e00                 # push buffer address for call to readsec
     push    $1                      # push number of sectors to read for call to readsec
-    push    $1                      # push low byte of start sector for call to readsec
-    push    $0                      # push high byte of start sector for call to readsec
+    push    $1                      # push low bytes of start sector for call to readsec
+    push    $0                      # push high bytes of start sector for call to readsec
     push    -2(%bp)                 # push drive number from 1st local variable for call to readsec
     call    _readsec
     add     $10, %sp                # cleanup stack after return from readsec
 
+    test    %ah, %ah                # if readsec returned status 0 then
+    jz      1f                      # print from the buffer
+
+    push    $err                    # else, push error message as param for call to print
+    call    _print
+    add     $2, %sp                 # cleanup stack after return from print
+    jmp     2f
+
+1:
     push    $0x7e00                 # push param for call to print
     call    _print
     add     $2, %sp                 # cleanup stack after return from print
+
+2:
 
 _hang:
     jmp     _hang
@@ -78,7 +89,9 @@ _print:
 #        nb - number of sectors to read
 #        buffer - buffer address
 # output: data from logical sector in start at memory location in buffer
-# void _readsec(uint16_t drive, uint32_t start, uint16_t nb, void* buffer)
+#         high byte of return value - status, 0 if no error
+#         low byte of return value - number of sectors actually read
+# uint16_t _readsec(uint16_t drive, uint32_t start, uint16_t nb, void* buffer)
 _readsec:
     push    %bp                     # save caller's %bp
     mov     %sp, %bp                # use %bp to point at the current stack top
@@ -86,8 +99,8 @@ _readsec:
     push    %bx                     # save %bx
     push    %di                     # save %di
 
-    mov     8(%bp), %ax             # load low byte of start into %ax from parameter
-    mov     6(%bp), %dx             # load high byte of start into %dx from parameter
+    mov     8(%bp), %ax             # load low bytes of start into %ax from parameter
+    mov     6(%bp), %dx             # load high bytes of start into %dx from parameter
     divw    secs_per_track
     mov     %dl, %cl
     inc     %cl                     # %cl = physical sector = LBA sector % sec_per_track + 1
@@ -109,10 +122,10 @@ _readsec:
 1:
     mov     $0x2, %ah               # read sectors function code for int 0x13
     int     $0x13                   # call int 0x13
-    jnc     2f                      # all went well, return
+    jnc     2f                      # all went well, return status 0 in %ah and nb of sectors in %al
 
     dec     %di
-    jz      2f                      # if retry count is 0 give up
+    jz      2f                      # if retry count is 0 give up, return status != 0 in %ah and nb of sectors in %al
 
     mov     $0x0, %ah               # if error, reset disk system function code for int 0x13
     int     $0x13                   # call int 0x13
@@ -129,6 +142,8 @@ _readsec:
 # data
 msg:
     .asciz "Hello, world !"
+err:
+    .asciz "Error"
 
 # fill up the sector
     .fill 510 - (. - _0), 1, 0
