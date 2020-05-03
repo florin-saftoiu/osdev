@@ -1,8 +1,5 @@
     .code16
 
-    .set secs_per_track, 63
-    .set num_heads, 16
-
 _0:
     ljmp     $0x0, $_start          # bios may load boot sector at 0x0:0x7c00 or at 0x7c0:0x0
 
@@ -96,22 +93,27 @@ _readsec:
     push    %bp                     # save caller's %bp
     mov     %sp, %bp                # use %bp to point at the current stack top
 
+    sub     $2, %sp                 # make room for 1 local variable
+
     push    %bx                     # save %bx
     push    %di                     # save %di
 
-    mov     8(%bp), %ax             # load low bytes of start into %ax from parameter
-    mov     6(%bp), %dx             # load high bytes of start into %dx from parameter
-    divw    secs_per_track
-    mov     %dl, %cl
-    inc     %cl                     # %cl = physical sector = LBA sector % sec_per_track + 1
-
     xor     %dx, %dx
-    divw    num_heads
-    mov     %al, %ch                # %ch = bits 0..7 of cylinder = LBA sector / (num_heads * sec_per_track) = (LBA sector / sec_per_track) / num_heads
-    shl     $6, %ah
-    add     %ah, %cl                # %cl = bits 8..9 of cylinder + physical sector
+    mov     6(%bp), %ax             # load high bytes of start into %ax from parameter
+    divw    secs_per_track
+    mov     %ax, -2(%bp)            # save high bytes of quotient in 1st local variable
+    mov     8(%bp), %ax             # load low bytes of start into %ax from parameter
+    divw    secs_per_track
+    mov     %dl, %cl                # %cl = LBA sector % secs_per_track
+    inc     %cl                     # %cl = physical sector = LBA sector % secs_per_track + 1
 
-    mov     %dl, %dh                # %dh = head = (LBA sector / sec_per_track) % num_heads
+    mov     -2(%bp), %dx            # load saved high bytes of quotient from 1st local variable
+    divw    num_heads
+    mov     %al, %ch                # %ch = bits 0..7 of cylinder = LBA sector / (num_heads * secs_per_track) = (LBA sector / secs_per_track) / num_heads
+    shl     $6, %ah
+    or      %ah, %cl                # %cl = bits 8..9 of cylinder | physical sector
+
+    mov     %dl, %dh                # %dh = head = (LBA sector / secs_per_track) % num_heads
     
     movb    4(%bp), %dl             # load drive number into %dl from parameter
     movb    10(%bp), %al            # load number of sectors to read into %al from paramter
@@ -142,6 +144,10 @@ _readsec:
 # data
 msg:
     .asciz "Hello, world !"
+secs_per_track:
+    .word 63
+num_heads:
+    .word 255
 err:
     .asciz "Error"
 
