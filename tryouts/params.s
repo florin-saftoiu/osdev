@@ -24,7 +24,7 @@ _start:
     call    _print
     add     $2, %sp                 # cleanup stack after return from print
 
-    lea     -6(%bp), %ax           # load address of buffer for params into %ax
+    lea     -6(%bp), %ax            # load address of buffer for params into %ax
     push    %ax                     # push address of buffer for return value
     push    -2(%bp)                 # push drive number from 1st local variable for call to readsec
     call    _params
