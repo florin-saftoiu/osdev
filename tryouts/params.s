@@ -188,7 +188,7 @@ _params:
     incb    2(%bx)                  # get number of heads into params->heads
     
     mov     %cl, 3(%bx)             # put max sector into params->sector
-    and     $0b00111111, 3(%bx)     # isolate max sector, same as number of sectors, since it starts at 1
+    andb    $0b00111111, 3(%bx)     # isolate max sector, same as number of sectors, since it starts at 1
 
     pop     %bx                     # restore %bx
     pop     %di                     # restore %di
