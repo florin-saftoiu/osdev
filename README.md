@@ -6,7 +6,7 @@ This is a **hobby** project. The only goal is to learn how an OS' internals (inc
 
 It works in QEMU or VirtualBox.
 
-Boot sector uses GNU as with AT&T syntax (cause I wanted to try it). Same goes for second stage. Boot sector in the drive's Master Boot Record loads the second stage form the second sector of the drive. Second stage loads KERNEL.BIN from the root directory of the active exFAT partition. It should handle non-contiguous clusters.
+Boot sector uses GNU as with AT&T syntax (cause I wanted to try it). Same goes for second stage. Boot sector in the drive's Master Boot Record loads the second stage form the second sector of the drive. Second stage loads ```kernel.bin``` from the root directory of the active exFAT partition. It should handle non-contiguous clusters.
 
 Second stage goes into Protected Mode, then Long Mode and sets up a higher-half x64 kernel in ELF64 format, with the first 2Mb of real memory identity mapped to the first 2Mb of the higher-half of virtual memory.
 
