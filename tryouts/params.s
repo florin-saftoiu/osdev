@@ -15,7 +15,7 @@ _start:
     sti                             # interrupts can work again from here
 
     mov     %sp, %bp                # use %bp to point at the current stack top
-    sub     $10, %sp                # make room for 1 local variable and return value from call to param
+    sub     $6, %sp                 # make room for 2 local variables, 1 uint16_t and 1 params (see _params)
 
     xor     %dh, %dh                # make sure high byte of %dx is 0, because we can't just push %dl
     mov     %dx, -2(%bp)            # save drive number left by bios in %dl in 1st local variable
@@ -24,15 +24,13 @@ _start:
     call    _print
     add     $2, %sp                 # cleanup stack after return from print
 
-    push    -2(%bp)                 # push drive number from 1st local variable for call to readsec
-    lea     -10(%bp), %ax           # load address of buffer for return value into %ax
+    lea     -6(%bp), %ax           # load address of buffer for params into %ax
     push    %ax                     # push address of buffer for return value
+    push    -2(%bp)                 # push drive number from 1st local variable for call to readsec
     call    _params
     add     $4, %sp                 # cleanup stack after return from params
 
-    lea     -10(%bp), %si
-    mov     (%si), %ax
-    test    %ax, %ax                # if params returned status 0 then
+    test    %ah, %ah                # if params returned status 0 then
     jz      1f                      # print params
 
     push    $err                    # else, push error message as param for call to print
@@ -41,6 +39,8 @@ _start:
     jmp     2f
 
 1:
+    lea     -6(%bp), %si
+
     mov     $0xe, %ah               # teletype output function code for int 0x10
     mov     $0x7, %bx               # output on page 0 (0 in %bh) with white on black (0 << 4 + 7 in %bl)
 
@@ -48,7 +48,7 @@ _start:
     int     $0x10
 
     push    %ax
-    push    2(%si)
+    push    (%si)
     call    _print_nb
     add     $2, %sp
     pop     %ax
@@ -61,7 +61,8 @@ _start:
     int     $0x10
     
     push    %ax
-    push    4(%si)
+    movzbw  2(%si), %ax
+    push    %ax
     call    _print_nb
     add     $2, %sp
     pop     %ax
@@ -74,7 +75,8 @@ _start:
     int     $0x10
 
     push    %ax
-    push    6(%si)
+    movzbw  3(%si), %ax
+    push    %ax
     call    _print_nb
     add     $2, %sp
     pop     %ax
@@ -160,43 +162,34 @@ _print_nb:
 # input: drive - drive number
 # output: return value - structure with status, number of cylinders, number of heads, number of sectors
 # typedef struct {
-#     uint16_t status;
 #     uint16_t cylinders;
-#     uint16_t heads;
-#     uint16_t sectors;
+#     uint8_t heads;
+#     uint8_t sectors;
 # } params;
-# params _params(uint16_t drive)
+# uint16_t _params(uint16_t drive, params* params)
 _params:
     push    %bp                     # save caller's %bp
     mov     %sp, %bp                # use %bp to point at the current stack top
 
     push    %di                     # save %di
     push    %bx                     # save %bx, because int 0x13, ah 0x8 trashes it
-    push    %si                     # save %si
 
     mov     $0x8, %ah               # get drive parameters function code for int 0x13
-    mov     6(%bp), %dl             # load drive number into %dl from parameter
+    mov     4(%bp), %dl             # load drive number into %dl from parameter
     xor     %di, %di                # %es:%di should be 0x0:0x0 for call to int 0x13 get drive params
-    int     $0x13                   # call int 0x13
+    int     $0x13                   # call int 0x13, status is put in %ax and returned as is
 
-    mov     4(%bp), %si             # load address of buffer for return value from parameter
-    movzbw  %ah, %ax                # zero-extend status from %ah into %ax
-    mov     %ax, (%si)              # put status into return value struct
-    mov     %ch, %al                # put low bits of max cylinder into %al
-    mov     %cl, %ah                # isolate high bits of max cylinder
-    shr     $6, %ah                 # into %ah
-    inc     %ax                     # get number of cylinders into %ax
-    mov     %ax, 2(%si)             # put number of cylinders into return value struct
-    movzbw  %dh, %ax                # zero-extend max head from %dh into %ax
-    inc     %ax                     # get number of heads into %ax
-    mov     %ax, 4(%si)             # put number of heads into return value struct
-    and     $0b00111111, %cl        # isolate max sector, same as number of sectors, since it starts at 1
-    movzbw  %cl, %ax                # zero-extend number of sectors into %ax
-    mov     %ax, 6(%si)             # put number of sectors into return value struct
+    mov     6(%bp), %bx             # load address of buffer from parameter
+    mov     %ch, 1(%bx)             # put low bits of max cylinder into low bits of params->cylinders
+    mov     %cl, (%bx)              # isolate high bits of max cylinder
+    shrb    $6, (%bx)               # into high bits of params->cylinders
+    incw    (%bx)                   # get number of cylinders into params->cylinders
+    mov     %dh, 2(%bx)             # put max head into params->heads
+    incb    2(%bx)                  # get number of heads into params->heads
+    
+    mov     %cl, 3(%bx)             # put max sector into params->sector
+    and     $0b00111111, 3(%bx)     # isolate max sector, same as number of sectors, since it starts at 1
 
-    mov     4(%bp), %ax             # return pointer to space reserved by the caller
-
-    pop     %si                     # restore %si
     pop     %bx                     # restore %bx
     pop     %di                     # restore %di
 
