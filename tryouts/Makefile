@@ -1,5 +1,6 @@
 print_offset:=0x7c00
 readsec_offset:=0x7c00
+params_offset:=0x7c00
 
 .PRECIOUS: %.tmp %.o
 
