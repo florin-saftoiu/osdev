@@ -10,8 +10,9 @@
 # continue
 # dd if=/dev/zero of=drive.img bs=512 count=2
 # dd if=bootsect.bin of=drive.img conv=notrunc
-.code16
-.set stage2_start, 0x8000
+    .code16
+    .set stage2_start, 0x8000
+
 _start:
     cli
     xor     %ax, %ax
@@ -19,7 +20,7 @@ _start:
     mov     %ax, %es                        # useful for call to _readsec
     mov     $((stage2_start - 0x200) / 0x10), %ax
     mov     %ax, %ss                        # stack starts right after the boot sector
-    mov     $0x1fe, %sp                     # stack length 512 bytes, will grow down from stage2_start
+    mov     $0x200, %sp                     # stack length 512 bytes, will grow down from stage2_start
     sti
     mov     $msg_start, %si
     call    _print
@@ -149,7 +150,7 @@ num_heads:
     .word 16
 
 # fill up the sector
-.fill 440 - (. - _start), 1, 0
+    .fill 440 - (. - _start), 1, 0
 
 unique_disk_id:
     .long 0xf41aa958
@@ -173,4 +174,4 @@ pt:
     .fill 16, 1, 0                          # partition 4
 
 # boot identifier
-.word 0xaa55
+    .word 0xaa55
