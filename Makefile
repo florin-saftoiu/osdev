@@ -39,7 +39,7 @@ build/%.tmp: build/%.o
 	x86_64-elf-ld -T NUL -Ttext=$($(basename $@)_offset) -o $@ $<
 
 build/%.o: src/%.s
-	x86_64-elf-as --divide -o $@ $<
+	x86_64-elf-as --divide -g -o $@ $<
 
 build/%.o: src/%.c
 	x86_64-elf-gcc -c $< -o $@ -Iinclude -g -ffreestanding -O0 -Wall -Wextra -mcmodel=large -mno-red-zone -mgeneral-regs-only
