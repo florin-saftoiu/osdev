@@ -13,11 +13,14 @@
     .code16
     .set stage2_start, 0x8000
 
+_0:
+    ljmp    $0x0, $_start
+
 _start:
     cli
     xor     %ax, %ax
     mov     %ax, %ds                        # useful for call to _print
-    mov     %ax, %es                        # useful for call to _readsec
+    mov     %ax, %es                        # useful for call to int 0x13 for params and _readsec
     mov     $((stage2_start - 0x200) / 0x10), %ax
     mov     %ax, %ss                        # stack starts right after the boot sector
     mov     $0x200, %sp                     # stack length 512 bytes, will grow down from stage2_start
@@ -102,25 +105,35 @@ _print:
 # output: data from logical sector in %ds:%ax at memory location %es:%bx
 #         CF - set on error
 _readsec:
-    mov     $3, %di                         # retry counter
+
     push    %cx                             # put number of sectors to read and drive number on stack
     mov     %sp, %bp                        # save a stack pointer in %bp
-1:
+
+    push    %bx                             # put buffer offset on stack
+    push    %ax                             # save low bytes of start sector
+    mov     %dx, %ax                        # load high bytes of start sector into %ax
+    xor     %dx, %dx
+    divw    secs_per_track
+    mov     %ax, %bx                        # save high bytes of quotient in %bx
+    pop     %ax                             # restore low bytes of start sector into %ax
     divw    secs_per_track
     mov     %dl, %cl
     inc     %cl                             # %cl = physical sector = LBA sector % sec_per_track + 1
 
-    xor     %dx, %dx
+    mov     %bx, %dx                        # load saved high bytes of quotient
     divw    num_heads
     mov     %al, %ch                        # %ch = bits 0..7 of cylinder = LBA sector / (num_heads * sec_per_track) = (LBA sector / sec_per_track) / num_heads
     shl     $6, %ah
-    add     %ah, %cl                        # %cl = bits 8..9 of cylinder + physical sector
+    or      %ah, %cl                        # %cl = bits 8..9 of cylinder + physical sector
 
     mov     %dl, %dh                        # %dh = head = (LBA sector / sec_per_track) % num_heads
     
+    pop     %bx                             # restore buffer offset into %bx
     movb    (%bp), %dl                      # %dl = drive number
     movb    1(%bp), %al                     # %al = number of sectors to read
 
+    mov     $3, %di                         # retry counter
+1:
     mov     $0x2, %ah
     int     $0x13
     jnc     2f                              # all went well, return
@@ -150,7 +163,7 @@ num_heads:
     .word 16
 
 # fill up the sector
-    .fill 440 - (. - _start), 1, 0
+    .fill 440 - (. - _0), 1, 0
 
 unique_disk_id:
     .long 0xf41aa958
